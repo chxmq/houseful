@@ -142,7 +142,13 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
               ) : state.mine.waitlistPosition != null ? (
                 <WaitlistSpot position={state.mine.waitlistPosition} slug={event.id} />
               ) : state.cancelled ? (
-                <p className="rounded-[4px] bg-paper-deep p-5">This show was cancelled. Holders can claim a full refund.</p>
+                <p className="rounded-[4px] bg-paper-deep p-5">
+                  This show was cancelled. If you hold a ticket or a waitlist place, claim your full refund from{" "}
+                  <Link href="/tickets" className="font-semibold underline underline-offset-4">
+                    your tickets
+                  </Link>
+                  .
+                </p>
               ) : (
                 <>
                   <VerifyHuman
