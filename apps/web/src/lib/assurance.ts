@@ -9,10 +9,11 @@ export type AssuranceInput = {
 /**
  * The minimum credential that makes cheating cost more than it earns.
  *
- * A face-value, surrender-only ticket has no resale margin, so for most shows a
- * Selfie Check is enough to stop one person farming many wallets. Shows where
- * demand already exceeds supply attract organised buying, so they ask for the
- * strongest uniqueness guarantee World offers.
+ * A face-value, surrender-only ticket has no on-chain resale margin, so for most
+ * shows a Selfie Check is enough to stop one person farming many wallets. The
+ * private key can still be sold off-platform. Shows where demand already exceeds
+ * supply attract organised buying, so they ask for World's strongest uniqueness
+ * guarantee.
  */
 export function assuranceFor(event: AssuranceInput): Assurance {
   if (event.status === "sold_out") return "human";

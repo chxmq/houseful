@@ -40,9 +40,9 @@ async function WaitlistContent({ params }: Pick<PageProps<"/e/[slug]/waitlist">,
         </h1>
         <div className="mt-5 grid gap-6 text-ink-soft md:grid-cols-2">
           <p>
-            Everyone waiting for {e.title} on {formatLongDate(e.startsAt)}, in the order they joined. Each person is a
-            verified human with one place in line, and when a ticket comes back it goes to the first person still
-            waiting. Nobody, including the host, can reorder it.
+            Everyone waiting for {e.title} on {formatLongDate(e.startsAt)}, in the order they joined. Each live join is
+            one World ID with one place in line; seeded demo seats skipped verification. When a ticket comes back it
+            goes to the first person still waiting. Nobody, including the host, can reorder it.
           </p>
           <p>
             Each entry is folded into a running hash that the contract stores. This page recomputes that hash in your

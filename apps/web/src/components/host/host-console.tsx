@@ -125,7 +125,7 @@ function HostedRow({
           <Stat label="Waiting" value={String(show.waitlistActive)} />
           <Stat
             label={ended ? "Proceeds" : "Proceeds at the end"}
-            value={meta ? formatInr(meta.priceInr * held) : `${formatEth(proceeds)} ETH`}
+            value={meta ? formatInr(meta.priceInr * held) : formatEth(proceeds)}
           />
         </dl>
         {error ? <p className="mt-3 text-sm font-medium text-reject">{error}</p> : null}

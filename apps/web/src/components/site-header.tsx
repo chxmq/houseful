@@ -21,7 +21,7 @@ export function SiteHeader({ city }: SiteHeaderProps) {
   const base = city ? `/${city.slug}` : "/mumbai";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/95 backdrop-blur-[2px]">
+    <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper">
       <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-6 px-5 md:px-8">
         <Link href={base} aria-label="Houseful home">
           <Wordmark />

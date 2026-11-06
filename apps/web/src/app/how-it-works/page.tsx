@@ -23,7 +23,7 @@ const contents = [
 const limits = [
   {
     title: "Someone can still be paid to queue.",
-    body: "A verified person can be paid to buy a ticket and go. With no resale margin, there is no profit to share, so paying people to stand in line costs money and earns nothing back.",
+    body: "A verified person can be paid to buy a ticket and go. With no on-chain resale margin there is little profit to share, though someone could still sell the phone's wallet key off-platform.",
   },
   {
     title: "The waitlist is first come, first served.",

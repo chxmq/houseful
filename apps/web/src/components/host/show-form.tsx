@@ -70,7 +70,8 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
     };
   }, [form]);
 
-  const slugPreview = `${slugify(form.title) || "your-show"}-····`;
+  const titleSlug = slugify(form.title);
+  const slugPreview = `${titleSlug || "your-show"}-····`;
   const check = draftSchema.safeParse({ ...draftBase, slug: "preview" });
   const issues = check.success ? [] : [...new Set(check.error.issues.map((i) => String(i.path[0])))];
   const venue = venues.find((v) => v.id === form.venueId);
@@ -80,12 +81,22 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
     : Number(terms.surrenderCutoff) <= openedAt + 600
       ? "Hand-backs would already be closed. Pick a later date or a shorter cutoff."
       : null;
-  const ready = check.success && !scheduleProblem;
+  const slugProblem = form.title.trim().length >= 2 && !titleSlug
+    ? "Add a few English letters to the title so we can make a URL."
+    : null;
+  const ready = check.success && !scheduleProblem && !slugProblem;
 
   async function submit() {
+    if (!titleSlug) {
+      setPhase({ kind: "failed", error: slugProblem ?? "Add a few English letters to the title so we can make a URL." });
+      return;
+    }
     const suffix = Array.from(crypto.getRandomValues(new Uint8Array(2)), (b) => b.toString(16).padStart(2, "0")).join("");
-    const parsed = draftSchema.safeParse({ ...draftBase, slug: `${slugify(form.title)}-${suffix}` });
-    if (!parsed.success) return;
+    const parsed = draftSchema.safeParse({ ...draftBase, slug: `${titleSlug}-${suffix}` });
+    if (!parsed.success) {
+      setPhase({ kind: "failed", error: "The form still has a problem. Check the highlighted fields." });
+      return;
+    }
     try {
       setPhase({ kind: "working", step: 0 });
       const { hash } = await createShow(parsed.data);
@@ -243,6 +254,7 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
                   <p className="mb-4 text-sm text-ink-soft">Still needed: {issues.map((k) => fieldNames[k] ?? k).join(", ")}.</p>
                 ) : null}
                 {scheduleProblem ? <p className="mb-4 text-sm font-medium text-reject">{scheduleProblem}</p> : null}
+                {slugProblem ? <p className="mb-4 text-sm font-medium text-reject">{slugProblem}</p> : null}
                 <button
                   type="submit"
                   disabled={!ready}
@@ -271,7 +283,7 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
           <p className="mb-3 text-[10px] uppercase tracking-[0.18em] text-paper/50">What your wallet signs</p>
           <p>houseful.createEvent({"{"}</p>
           <div className="pl-4">
-            <Term name="faceValue" value={terms ? `${formatEth(terms.faceValue)} ETH` : "…"} note={formatInr(form.priceInr)} />
+            <Term name="faceValue" value={terms ? formatEth(terms.faceValue) : "…"} note={formatInr(form.priceInr)} />
             <Term name="capacity" value={terms ? String(terms.capacity) : "…"} note="one per verified person" />
             <Term
               name="surrenderCutoff"
