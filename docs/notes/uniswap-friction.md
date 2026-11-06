@@ -19,32 +19,32 @@ Live `buyWithEth` on Unichain Sepolia (1301) through SwapRouter02, with a WETH/U
 
 ## Log
 
-### 01:35 — rename commit landed
+### 01:35: rename commit landed
 
 `acef39d` prices the catalog in USDT. Contract rewrite started.
 
-### 01:36 — bridge address confirmed
+### 01:36: bridge address confirmed
 
 Superchain registry `sepolia/unichain.toml` lists
 `L1StandardBridgeProxy = 0xea58fcA6849d79EAd1f26608855c2D6407d54Ce2` for chain id 1301.
 Matches the spec.
 
-### 01:50 — operator balances checked
+### 01:50: operator balances checked
 
 Operator `0x4e1D675AFb8dceA73bee527951a715d2B7536655`:
 - Ethereum Sepolia: **99.499999999989836016 ETH**
 - Unichain Sepolia: **0 ETH**
 
-### 01:51 — bridged 3 ETH
+### 01:51: bridged 3 ETH
 
 `depositETH(200000, 0x)` on the confirmed L1StandardBridgeProxy.
 L1 tx: `0x6930620933284f58d313a228001e19b61205af1200fd8b66b87fc1b1477db256`
 
-### 01:52 — L2 credit
+### 01:52: L2 credit
 
 Unichain balance reached 3 ETH about **60 seconds** after the L1 receipt.
 
-### 01:53 — deployed TestUSDT + Houseful
+### 01:53: deployed TestUSDT + Houseful
 
 - TestUSDT: `0x75a6Cb564AF5A94259238Ef62369E1BC30fDFD5a` (stable)
 - First Houseful (prove): `0x26fc1B16FaDE5B92B82CcF5eA598f5b9513430D1`
@@ -54,7 +54,7 @@ Unichain balance reached 3 ETH about **60 seconds** after the L1 receipt.
 - Verifier: `0x805d719053f43b96631E8C617B45e41DA085d9F2`
 - Wrote `deployments/1301.json`
 
-### 01:54 — first pool
+### 01:54: first pool
 
 `createAndInitializePoolIfNecessary` + full-range mint (1 ETH + 3,000 USDT) through NPM.
 - Pool: `0x64921E7Bc30A947626e54143578937B32D329BC6`
@@ -62,12 +62,12 @@ Unichain balance reached 3 ETH about **60 seconds** after the L1 receipt.
 - Mint tx: `0x1ebd231a0cb401f67744a90abcf16b0c4204d2fb3080583dd0deadd746cfae4f`
 - Doc gap: factory `getPool` can still return zero for a few hundred ms after create on this RPC. Re-query before treating create as failed.
 
-### 01:55 — first QuoterV2 quote
+### 01:55: first QuoterV2 quote
 
 `quoteExactOutputSingle` for 10 USDT out returned **0.003354545241074395 ETH** in.
 Time from deploy to first working quote: **about 2 minutes**.
 
-### 01:55 — first `buyWithEth`
+### 01:55: first `buyWithEth`
 
 `scripts/prove-uniswap.ts` bought event #1 ticket 0 on the first Houseful deploy.
 - Tx: `0x3c08d9ca308ad68c6446a8f26a45869fa82aaac78c773cee7cb775249a616966`
