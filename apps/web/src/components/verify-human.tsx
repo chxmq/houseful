@@ -39,6 +39,8 @@ type VerifyHumanProps = {
   label: string;
   onVerified: (attestation: Attestation) => void;
   onFailed: (failure: VerifyFailure) => void;
+  /** Optional classes for the primary CTA. */
+  className?: string;
 };
 
 function failureFromIdkit(code: IDKitErrorCodes): VerifyFailure {
@@ -63,7 +65,16 @@ function failureFromIdkit(code: IDKitErrorCodes): VerifyFailure {
   }
 }
 
-export function VerifyHuman({ eventId, wallet, purpose, assurance, label, onVerified, onFailed }: VerifyHumanProps) {
+export function VerifyHuman({
+  eventId,
+  wallet,
+  purpose,
+  assurance,
+  label,
+  onVerified,
+  onFailed,
+  className = "",
+}: VerifyHumanProps) {
   const [request, setRequest] = useState<WorldRequest | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -120,7 +131,7 @@ export function VerifyHuman({ eventId, wallet, purpose, assurance, label, onVeri
         type="button"
         onClick={start}
         disabled={busy}
-        className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-ink px-6 py-4 text-base font-semibold text-paper disabled:opacity-60"
+        className={`inline-flex w-full items-center justify-center gap-3 rounded-full bg-stamp px-6 py-4 text-base font-semibold text-paper shadow-[0_12px_28px_-14px_rgba(226,64,27,0.9)] transition hover:bg-stamp-deep disabled:opacity-60 ${className}`}
       >
         <PersonCheckIcon />
         {busy ? "Opening World ID" : label}

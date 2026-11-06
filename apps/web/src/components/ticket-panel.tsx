@@ -60,10 +60,10 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
 
   if (event.chainEventId == null) {
     return (
-      <div className="mt-8 rounded-[4px] bg-paper-deep p-6">
-        <p className="font-display text-3xl font-extrabold uppercase">{formatUsdt(event.priceUsd)}</p>
-        <p className="mt-2 max-w-[48ch] text-ink-soft">
-          This show is listed so you can plan. Booking opens here when the host moves their sale over.
+      <div>
+        <p className="font-display text-4xl font-black uppercase leading-none">{formatUsdt(event.priceUsd)}</p>
+        <p className="mt-3 max-w-[42ch] text-ink-soft">
+          Listed so you can plan. Booking opens here when the host moves the sale over.
         </p>
       </div>
     );
@@ -71,9 +71,9 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
 
   if (event.status === "announced") {
     return (
-      <div className="mt-8 rounded-[4px] bg-paper-deep p-6">
-        <p className="font-display text-3xl font-extrabold uppercase">On sale soon</p>
-        <p className="mt-2 text-ink-soft">The price is set at {formatUsdt(event.priceUsd)} and will not change.</p>
+      <div>
+        <p className="font-display text-4xl font-black uppercase leading-none">On sale soon</p>
+        <p className="mt-3 text-ink-soft">Price locked at {formatUsdt(event.priceUsd)}.</p>
       </div>
     );
   }
@@ -117,32 +117,44 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   }
 
   return (
-    <div className="mt-8">
-      <div className="flex flex-wrap items-end justify-between gap-6">
+    <div>
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="font-display text-[56px] font-black leading-none">{formatUsdt(event.priceUsd)}</p>
-          <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-            Paid in test USDT · same price for everyone
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">From</p>
+          <p className="mt-1 font-display text-[clamp(2.75rem,8vw,4.25rem)] font-black leading-[0.9] tracking-tight">
+            {formatUsdt(event.priceUsd)}
           </p>
         </div>
         {state ? (
           state.available > 0 ? (
             <div className="text-right">
               <SplitFlap value={String(state.available).padStart(3, "0")} className="text-3xl" />
-              <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">seats left</p>
+              <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">left</p>
             </div>
           ) : (
             <div className="text-right">
               <SplitFlap value={String(state.waitlistActive).padStart(3, "0")} className="text-3xl" />
-              <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-stamp">waiting for a seat</p>
+              <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-stamp">in line</p>
             </div>
           )
         ) : (
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-            {error ? "Could not reach the ticket contract" : "Reading the contract"}
+            {error ? "Offline" : "Checking seats"}
           </p>
         )}
       </div>
+
+      <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-soft">
+        <span>Fixed price</span>
+        <span className="text-ink/25" aria-hidden>
+          ·
+        </span>
+        <span>One per person</span>
+        <span className="text-ink/25" aria-hidden>
+          ·
+        </span>
+        <span>Full refund if cancelled</span>
+      </p>
 
       <div className="mt-6">
         <AnimatePresence mode="wait" initial={false}>
@@ -158,8 +170,8 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
               ) : state.mine.waitlistPosition != null ? (
                 <WaitlistSpot position={state.mine.waitlistPosition} slug={event.id} />
               ) : state.cancelled ? (
-                <p className="rounded-[4px] bg-paper-deep p-5">
-                  This show was cancelled. If you hold a ticket or a waitlist place, claim your full refund from{" "}
+                <p className="rounded-[4px] bg-paper-deep p-5 text-sm">
+                  This show was cancelled. Claim your refund from{" "}
                   <Link href="/tickets" className="font-semibold underline underline-offset-4">
                     your tickets
                   </Link>
@@ -168,7 +180,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
               ) : (
                 <>
                   {mode !== "join" ? (
-                    <div className="mb-6">
+                    <div className="mb-5">
                       <SeatMap
                         chainEventId={event.chainEventId!}
                         capacity={state.capacity}
@@ -181,12 +193,10 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
 
                   {ethOk ? (
                     <div className="mb-4 flex flex-wrap gap-2">
-                      <PayChoice selected={pay === "usdt"} onClick={() => setPay("usdt")} label="Pay with USDT" />
-                      <PayChoice selected={pay === "eth"} onClick={() => setPay("eth")} label="Pay with ETH" />
+                      <PayChoice selected={pay === "usdt"} onClick={() => setPay("usdt")} label="Pay in USDT" />
+                      <PayChoice selected={pay === "eth"} onClick={() => setPay("eth")} label="Pay in ETH" />
                     </div>
-                  ) : (
-                    <p className="mb-4 text-sm text-ink-soft">You will pay {formatUsdt(event.priceUsd)} in test USDT.</p>
-                  )}
+                  ) : null}
 
                   {seatReady ? (
                     <>
@@ -197,30 +207,25 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                         assurance={event.assurance}
                         label={
                           mode === "join"
-                            ? "Verify and join the waitlist"
+                            ? "Join the waitlist"
                             : mode === "claim"
-                              ? "Verify and take a returned seat"
+                              ? "Take a returned seat"
                               : seated && seat
-                                ? `Verify and buy ${seatCaption(seat)}`
-                                : "Verify and buy"
+                                ? `Get ${seatCaption(seat)}`
+                                : "Get tickets"
                         }
                         onVerified={onVerified}
                         onFailed={(failure) => setPhase({ name: "failed", failure })}
                       />
                       <p className="mt-3 text-sm text-muted">
                         {mode === "join"
-                          ? `You lock ${formatUsdt(event.priceUsd)} now. If a seat comes back, it is yours automatically. Leave any time for a full refund.`
-                          : `World ID ${credential.label} keeps it to one ticket per person. We never see who you are.`}
-                      </p>
-                      <p className="mt-2 text-sm text-ink-soft">
-                        No World App on this phone? In the next step open the{" "}
-                        <span className="font-medium text-ink">simulator</span> and continue. You still get a real testnet
-                        ticket.
+                          ? `Locks ${formatUsdt(event.priceUsd)}. Leave any time for a full refund.`
+                          : `Checked with ${credential.label}. No World App? Use the simulator in the next step.`}
                       </p>
                     </>
                   ) : (
-                    <p className="rounded-[4px] bg-paper-deep p-4 text-sm text-ink-soft">
-                      Pick a seat above, then you can pay.
+                    <p className="rounded-[4px] bg-paper-deep/80 px-4 py-3 text-sm text-ink-soft">
+                      Pick a seat to continue.
                     </p>
                   )}
                 </>
