@@ -101,9 +101,13 @@ export function VerifyHuman({ eventId, wallet, purpose, assurance, label, onVeri
       const failure: VerifyFailure =
         data.code === "already-holds"
           ? { kind: "already-holds", message: data.error }
-          : { kind: "rejected", message: data.error ?? "The proof did not check out." };
+          : data.code === "weak-credential" || data.code === "credential_unavailable"
+            ? { kind: "no-credential", message: data.error }
+            : { kind: "rejected", message: data.error ?? "The proof did not check out." };
+      // Resolve the host check without throwing. IDKit treats a thrown error as
+      // failed_by_host_app and replaces our already-holds / weak-credential copy.
       onFailed(failure);
-      throw new Error(failure.message);
+      return;
     }
     onVerified(data as Attestation);
   }

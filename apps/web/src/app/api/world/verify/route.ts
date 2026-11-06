@@ -1,7 +1,7 @@
 import type { IDKitResult } from "@worldcoin/idkit";
 import { isAddress } from "viem";
 import { z } from "zod";
-import { worldActionFor } from "@/lib/assurance";
+import { assuranceFor, worldActionFor } from "@/lib/assurance";
 import { contractAddress, housefulAbi } from "@/lib/contract";
 import { signAttestation } from "@/server/attest";
 import { getEvent } from "@/server/catalog";
@@ -31,13 +31,15 @@ export async function POST(req: Request) {
   if (!event || event.chainEventId == null) return fail(404, "not-on-sale", "This show is not on sale through Houseful.");
 
   const action = worldActionFor(event.id);
+  const assurance = assuranceFor(event);
 
   let human;
   try {
-    human = await verifyWorldProof(result, { action, wallet });
+    human = await verifyWorldProof(result, { action, wallet, assurance });
   } catch (err) {
     if (err instanceof WorldVerificationError) {
-      return fail(err.code === "world-unreachable" ? 503 : 422, err.code, err.message);
+      const status = err.code === "world-unreachable" ? 503 : err.code === "weak-credential" ? 403 : 422;
+      return fail(status, err.code, err.message);
     }
     throw err;
   }
