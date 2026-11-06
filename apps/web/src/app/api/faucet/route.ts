@@ -3,9 +3,13 @@ import { privateKeyToAccount } from "viem/accounts";
 import { z } from "zod";
 import { activeChain } from "@/lib/chain";
 
-const body = z.object({ address: z.string().refine(isAddress, "Not an address") });
+const body = z.object({
+  address: z.string().refine(isAddress, "Not an address"),
+  needWei: z.string().regex(/^\d+$/).optional(),
+});
 
-const DRIP = parseEther(process.env.FAUCET_DRIP_ETH ?? "0.02");
+const MIN_DRIP = parseEther(process.env.FAUCET_DRIP_ETH ?? "0.02");
+const MAX_DRIP = parseEther(process.env.FAUCET_MAX_DRIP_ETH ?? "0.05");
 const recent = new Map<string, number>();
 
 export async function POST(req: Request) {
@@ -22,6 +26,9 @@ export async function POST(req: Request) {
   }
   recent.set(address, Date.now());
 
+  const need = parsed.data.needWei ? BigInt(parsed.data.needWei) : MIN_DRIP;
+  const value = need > MAX_DRIP ? MAX_DRIP : need < MIN_DRIP ? MIN_DRIP : need;
+
   const client = createWalletClient({
     account: privateKeyToAccount(key as `0x${string}`),
     chain: activeChain,
@@ -29,8 +36,8 @@ export async function POST(req: Request) {
   });
 
   try {
-    const hash = await client.sendTransaction({ to: address, value: DRIP });
-    return Response.json({ hash });
+    const hash = await client.sendTransaction({ to: address, value });
+    return Response.json({ hash, value: value.toString() });
   } catch (err) {
     recent.delete(address);
     return Response.json({ error: `Top-up failed: ${(err as Error).message.split("\n")[0]}` }, { status: 502 });

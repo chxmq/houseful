@@ -20,6 +20,14 @@ export async function cityEvents(citySlug: string, category?: string) {
   return catalog.listEvents({ city: citySlug, category: category as catalog.ListEventsInput["category"] });
 }
 
+/** Upcoming and past shows with a chain id, so refunds stay visible after endsAt. */
+export async function cityEventsForWallet(citySlug: string) {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("events");
+  return catalog.listEvents({ city: citySlug, includePast: true });
+}
+
 export async function featured(citySlug: string) {
   "use cache";
   cacheLife("minutes");
