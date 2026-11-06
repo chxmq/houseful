@@ -1,65 +1,78 @@
 /**
- * Chain-stream helpers for done-means 6 to 10.
- * Prefer the product harness when it lands; these keep the specs runnable against
- * a stubbed World edge and the device wallet until then.
+ * Steps the chain specs share. Each one waits for what the app shows when the step is really done, so a spec
+ * cannot move on while a purchase is still on its way.
  */
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
+/** Opens a show and waits until the page has read the chain: the seats left, or the line, is showing. */
+export async function openShow(page: Page, slug: string) {
+  await page.goto(`/e/${slug}`);
+  await expect(page.getByText(/^(left|in line)$/)).toBeVisible({ timeout: 30_000 });
+}
+
+/** Takes general admission when `seat` is left out, or the seat with that number. */
+export async function pickSeat(page: Page, seat?: number) {
+  if (seat === undefined) {
+    await page.getByRole("button", { name: "Continue without a seat" }).click();
+    return;
+  }
+  await page.getByRole("button", { name: `Seat ${seat}`, exact: true }).click();
+  await expect(page.getByText(`Seat ${seat} selected`)).toBeVisible();
+}
+
+/** USDT is "Pay now". "Pay with Ethereum" swaps the ETH for the face value inside the same transaction. */
+export async function choosePay(page: Page, method: "usdt" | "eth") {
+  await page.getByRole("button", { name: method === "usdt" ? "Pay now" : "Pay with Ethereum" }).click();
+}
+
+/** The words the panel shows when a purchase did not go through. */
+export function refusal(page: Page): Locator {
+  return page.getByRole("button", { name: "Try again" }).locator("xpath=ancestor::div[1]").locator("p").first();
+}
+
+/** Waits for `done`, and fails with the app's own words if the panel refuses instead. */
+async function expectDoneOrRefused(page: Page, done: Locator) {
+  const tryAgain = page.getByRole("button", { name: "Try again" });
+  await expect(done.or(tryAgain)).toBeVisible({ timeout: 120_000 });
+  if (await tryAgain.isVisible()) throw new Error(`The app refused: ${await refusal(page).innerText()}`);
+}
+
+/** Clicks the buy button of a show with seats left and waits for the ticket. */
+export async function buyTicket(page: Page) {
+  await page.getByRole("button", { name: /^Get (tickets|Seat \d+)$/ }).click();
+  await expectDoneOrRefused(page, page.getByRole("link", { name: "Open your ticket" }));
+}
+
+/** Clicks the button of a sold out show and waits for a place in line. */
+export async function joinWaitlist(page: Page) {
+  await page.getByRole("button", { name: "Join the waitlist" }).click();
+  await expectDoneOrRefused(page, page.getByText("You are on the waitlist"));
+}
+
+/** Opens the wallet page and waits until it has read the contract. */
+export async function openTickets(page: Page) {
+  await page.goto("/tickets");
+  await expect(page.getByText("Reading your tickets from the contract")).toBeHidden({ timeout: 30_000 });
+}
+
+/** Hands the ticket back from the wallet page. The seat goes to the next person in line, or back on sale. */
+export async function handBack(page: Page) {
+  await page.getByRole("button", { name: "Cannot make it? Hand it back" }).click();
+  await page.getByRole("button", { name: /^Hand back for \$\d+$/ }).click();
+  await expect(page.getByText(/^Refunded \$\d+\./)).toBeVisible({ timeout: 60_000 });
+}
+
+// Used by the specs that are not rewritten yet. Each goes when its last spec does.
 export const phone = { width: 375, height: 812 };
 export const desktop = { width: 1280, height: 800 };
 
-export async function openShow(page: Page, slug: string) {
-  await page.goto(`/e/${slug}`);
-  await expect(page.getByText(/\$\d+|Paid |Pay now|Pay with Ethereum/i).first()).toBeVisible({ timeout: 30_000 });
-}
-
-export async function pickSeat(page: Page, seatLabel?: string) {
-  const ga = page.getByRole("button", { name: /Continue without a seat/i });
-  if (await ga.isVisible().catch(() => false)) {
-    await ga.click();
-    return;
-  }
-  if (seatLabel) {
-    await page.getByRole("button", { name: seatLabel, exact: true }).click();
-    return;
-  }
-  const open = page.locator('button[aria-label^="Seat "]:not([disabled])').first();
-  await expect(open).toBeVisible({ timeout: 15_000 });
-  await open.click();
-}
-
-export async function choosePay(page: Page, method: "usdt" | "eth") {
-  const label = method === "usdt" ? /Pay now/i : /Pay with Ethereum/i;
-  const btn = page.getByRole("button", { name: label });
-  if (await btn.isVisible().catch(() => false)) await btn.click();
-}
-
 export async function verifyAndBuy(page: Page) {
-  // VerifyHuman uses the action label, not a fixed "Verify and buy" string.
   const verify = page.getByRole("button", {
     name: /Get tickets|Get Seat|Take a returned seat|Join the waitlist|Verify and buy/i,
   });
   await expect(verify).toBeVisible({ timeout: 30_000 });
   await verify.click();
-  // World stub in the product harness completes IDKit; wait for pay/bind progress or ticket.
   await expect(
     page.getByText(/Open your ticket|Paid face value|Bound this phone|Seat \d+ selected|General admission|You are on the waitlist|Your place in line/i).first(),
   ).toBeVisible({ timeout: 120_000 });
-}
-
-export async function expectSeatTakenMessage(page: Page) {
-  await expect(page.getByText(/was just taken|Pick another/i)).toBeVisible({ timeout: 15_000 });
-}
-
-export async function openTickets(page: Page) {
-  await page.goto("/tickets");
-  await expect(page.getByText(/Admit one|Nothing booked yet|Reading your tickets/i).first()).toBeVisible({
-    timeout: 30_000,
-  });
-}
-
-export async function handBack(page: Page) {
-  await page.getByRole("button", { name: /Cannot make it\? Hand it back/i }).click();
-  await page.getByRole("button", { name: /Hand back for/i }).click();
-  await expect(page.getByText(/Refunded|Your seat went/i)).toBeVisible({ timeout: 120_000 });
 }

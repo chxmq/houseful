@@ -1,58 +1,86 @@
 /**
- * Done-means 6: pick a seat, pay in USDT, another fan pays in ETH,
- * a just-taken seat is refused in plain words.
+ * Done-means 6: pick a seat and pay in USDT, another fan pays in ETH through the swap, and a seat that was just
+ * taken is refused in plain words. Each test lists a seated show of its own, so no test runs out of seats.
  */
 import { test, expect } from "../support/fixtures";
-import { choosePay, desktop, expectSeatTakenMessage, openShow, phone, pickSeat, verifyAndBuy } from "./helpers";
-
-const FLAGSHIP = "the-last-local-nsci-dome";
-const SEATED = process.env.E2E_SEATED_SLUG ?? FLAGSHIP;
+import { deviceWalletAddress, expectNoHorizontalScroll } from "../support/page";
+import { buyTicket, choosePay, openShow, openTickets, pickSeat, refusal } from "./helpers";
+import { listShow } from "./host";
 
 test.describe("seat and pay", () => {
-  for (const viewport of [
-    { name: "phone", size: phone },
-    { name: "desktop", size: desktop },
-  ]) {
-    test.describe(viewport.name, () => {
-      test.use({ viewport: viewport.size });
+  test("a fan picks a seat and pays in USDT", async ({ page, device, chain }) => {
+    const show = await listShow((await device()).page, chain, { seated: true, capacity: 12 });
 
-      test("fan picks a seat and pays in USDT", async ({ page }) => {
-        await openShow(page, SEATED);
-        await pickSeat(page);
-        await choosePay(page, "usdt");
-        await verifyAndBuy(page);
-        await expect(page.getByRole("link", { name: /Open your ticket/i })).toBeVisible();
-      });
+    await openShow(page, show.slug);
+    await expectNoHorizontalScroll(page);
+    await pickSeat(page, 7);
+    await choosePay(page, "usdt");
+    await buyTicket(page);
+    await expect(page.getByText("Seat 7", { exact: true })).toBeVisible();
 
-      test("another fan pays in ETH through the swap", async ({ page }) => {
-        test.skip(process.env.NEXT_PUBLIC_PAY_WITH_ETH === "false", "ETH checkout disabled");
-        await openShow(page, SEATED);
-        await pickSeat(page);
-        await choosePay(page, "eth");
-        await verifyAndBuy(page);
-        await expect(page.getByRole("link", { name: /Open your ticket/i })).toBeVisible();
-      });
-
-      test("a seat that was just taken is refused clearly", async ({ page, browser }) => {
-        await openShow(page, SEATED);
-        const seatBtn = page.locator('button[aria-label^="Seat "]:not([disabled])').first();
-        const label = await seatBtn.getAttribute("aria-label");
-        test.skip(!label, "no open seats left on this show");
-        await seatBtn.click();
-
-        const rival = await browser.newPage();
-        await rival.setViewportSize(viewport.size);
-        await openShow(rival, SEATED);
-        await rival.getByRole("button", { name: label!, exact: true }).click();
-        await choosePay(rival, "usdt");
-        await verifyAndBuy(rival);
-
-        await choosePay(page, "usdt");
-        const verify = page.getByRole("button", { name: /Get tickets|Get Seat|Verify and buy/i });
-        await verify.click();
-        await expectSeatTakenMessage(page);
-        await rival.close();
-      });
+    const fan = await deviceWalletAddress(page);
+    const bought = await chain.waitForEvent({
+      eventName: "TicketBought",
+      where: (log) => log.args.owner?.toLowerCase() === fan.toLowerCase(),
     });
-  }
+    expect(bought.args.eventId).toBe(BigInt(show.chainEventId));
+    expect(bought.args.seat).toBe(7);
+    // Paid with the plain button: the buy function, no ETH sent, and the face value in the contract's USDT ledger.
+    expect(await chain.callOf(bought.transactionHash)).toEqual({ functionName: "buy", ethSent: 0n });
+    expect((await chain.read.ledger(show.chainEventId)).proceeds).toBe(show.price);
+
+    // The wallet page shows the seat as well.
+    await openTickets(page);
+    await expect(page.getByText("Seat 7", { exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page);
+  });
+
+  test("another fan pays in ETH through the swap", async ({ page, device, chain }) => {
+    const show = await listShow((await device()).page, chain, { seated: true, capacity: 12 });
+
+    await openShow(page, show.slug);
+    await pickSeat(page, 3);
+    await choosePay(page, "eth");
+    await buyTicket(page);
+    await expect(page.getByText("Seat 3", { exact: true })).toBeVisible();
+
+    const fan = await deviceWalletAddress(page);
+    const bought = await chain.waitForEvent({
+      eventName: "TicketBought",
+      where: (log) => log.args.owner?.toLowerCase() === fan.toLowerCase(),
+    });
+    expect(bought.args.seat).toBe(3);
+    // Paid with the swap button: the ETH function, ETH sent along, and the swap still put the exact face value in the ledger.
+    const call = await chain.callOf(bought.transactionHash);
+    expect(call.functionName).toBe("buyWithEth");
+    expect(call.ethSent).toBeGreaterThan(0n);
+    expect((await chain.read.ledger(show.chainEventId)).proceeds).toBe(show.price);
+  });
+
+  test("a seat that was just taken is refused in plain words", async ({ page, device, chain }) => {
+    const show = await listShow((await device()).page, chain, { seated: true, capacity: 12 });
+    const rival = await device();
+
+    // The fan picks seat 5 while it is still free.
+    await openShow(page, show.slug);
+    await pickSeat(page, 5);
+
+    // Someone else takes it first.
+    await openShow(rival.page, show.slug);
+    await pickSeat(rival.page, 5);
+    await buyTicket(rival.page);
+
+    // The fan pays for the seat the page still shows as free.
+    await page.getByRole("button", { name: "Get Seat 5" }).click();
+    await expect(refusal(page)).toHaveText("Seat 5 was just taken. Pick another.");
+    const fan = await deviceWalletAddress(page);
+    expect(await chain.read.ticketOf(show.chainEventId, fan)).toBeNull();
+
+    // Trying again shows the seat as taken, and another seat can be bought.
+    await page.getByRole("button", { name: "Try again" }).click();
+    await expect(page.getByRole("button", { name: "Seat 5, taken" })).toBeDisabled();
+    await pickSeat(page, 6);
+    await buyTicket(page);
+    expect(await chain.read.ticketOf(show.chainEventId, fan)).not.toBeNull();
+  });
 });
