@@ -33,9 +33,9 @@ const CHAPTERS: Chapter[] = [
     id: "one-person",
     n: "01",
     kicker: "One person",
-    title: "A real person. Not a name.",
+    title: "One person can hold one ticket.",
     body: [
-      "World ID proves you are a unique human without telling anyone who you are. For each show it produces a number that is the same every time you try, and different for every other show. One number gets one ticket.",
+      "A person check helps keep one ticket per person for each show. Houseful receives a proof, not your selfie or document. Your wallet and ticket activity are public.",
       "Each show asks for the least it needs. Most ask for a Selfie Check. Shows where demand is higher than the seats ask for Proof of Human.",
     ],
     demo: <IdentityDemo />,
@@ -46,7 +46,7 @@ const CHAPTERS: Chapter[] = [
       lines: [
         { label: "Holder", value: HOLDER },
         { label: "Checked with", value: "Selfie Check" },
-        { label: "Face value", value: FACE_VALUE },
+        { label: "Ticket price", value: FACE_VALUE },
         { label: "Status", value: "Held" },
       ],
     },
@@ -54,21 +54,21 @@ const CHAPTERS: Chapter[] = [
   {
     id: "face-value",
     n: "02",
-    kicker: "Face value",
+    kicker: "Ticket price",
     title: "The price cannot move.",
     body: [
-      "The price is written into a public contract when the show is listed. There is no function to raise it later, for the host or for us.",
-      "Tickets cannot be transferred at all. A resale site can list yours at five times the price, but when a buyer tries, the transfer reverts. There is nothing to buy.",
+      "The show has a fixed price. The host cannot raise it once tickets are listed here.",
+      "Tickets cannot be sent or sold to another wallet. If you cannot go, return yours through the waitlist.",
     ],
     demo: <FaceValueDemo />,
     ticket: {
-      stub: "Face value",
-      status: "Resale above face value reverts",
+      stub: "Ticket price",
+      status: "Tickets cannot be transferred",
       gen: 1,
       lines: [
         { label: "Holder", value: HOLDER },
-        { label: "Face value", value: `${FACE_VALUE}, fixed` },
-        { label: "Transfers", value: "Always revert" },
+        { label: "Ticket price", value: `${FACE_VALUE}, fixed` },
+        { label: "Transfers", value: "Not allowed" },
         { label: "Status", value: "Held" },
       ],
     },
@@ -79,8 +79,8 @@ const CHAPTERS: Chapter[] = [
     kicker: "Resell at face value",
     title: "Cannot go? Resell at face value.",
     body: [
-      "You surrender the ticket to the contract and get the full price back. The first person on the waitlist, who paid into escrow when they joined, becomes the holder. It all happens in one transaction.",
-      "Nobody picks who gets it and nobody earns on it. Your old door code stops working the moment the seat moves.",
+      "Before the return deadline, you can return your ticket and get its price back in test USDT. If someone is waiting, the first person in line gets the seat using the payment they made when they joined.",
+      "The waiting order decides who gets it. An online door sees the change after it syncs; an offline door needs a fresh sync before it can reject the old holder.",
     ],
     demo: <HandBackDemo />,
     ticket: {
@@ -99,10 +99,10 @@ const CHAPTERS: Chapter[] = [
     id: "the-door",
     n: "04",
     kicker: "The door",
-    title: "A code that will not keep.",
+    title: "A door code that changes.",
     body: [
-      "At the door your ticket shows a code that changes every 20 seconds. Your phone signs each one with a key that never leaves it.",
-      "The door phone checks everything itself: our signature on the ticket, your phone's signature on the code, the time, and whether the ticket is already in. No signal needed. After a scanner has synced, older codes stop working there.",
+      "At the door your ticket shows a code that changes every 20 seconds. Your phone makes each code using its saved ticket key.",
+      "After syncing, the door phone can check codes without a network. Old codes expire. A fresh screenshot may still work briefly, and separate offline doors do not share who has entered until they sync.",
     ],
     demo: <DoorDemo />,
     ticket: {
@@ -112,7 +112,7 @@ const CHAPTERS: Chapter[] = [
       lines: [
         { label: "Holder", value: NEXT },
         { label: "Door code", value: "New every 20s" },
-        { label: "Face value", value: FACE_VALUE },
+        { label: "Ticket price", value: FACE_VALUE },
         { label: "Status", value: "Admitted" },
       ],
     },
@@ -121,10 +121,10 @@ const CHAPTERS: Chapter[] = [
     id: "cancelled",
     n: "05",
     kicker: "Cancelled shows",
-    title: "Cancelled means refunded.",
+    title: "Cancelled? Ask for your money back.",
     body: [
-      "If a host cancels, every ticket holder and everyone on the waitlist can pull their money straight from the contract.",
-      "The host cannot withdraw from a cancelled show. There is no function, ours or theirs, that can pause or block a refund.",
+      "If a host cancels, ticket holders and people on the waitlist can ask for their payment back in test USDT.",
+      "The host cannot take the payments for a cancelled show. Fans request their own refunds, so the host does not need to approve each one.",
     ],
     demo: <RefundDemo />,
     ticket: {
@@ -134,7 +134,7 @@ const CHAPTERS: Chapter[] = [
       lines: [
         { label: "Holder", value: NEXT },
         { label: "Refund", value: FACE_VALUE },
-        { label: "Can block it", value: "Nobody" },
+        { label: "Host approval", value: "Not needed" },
         { label: "Status", value: "Refunded" },
       ],
     },

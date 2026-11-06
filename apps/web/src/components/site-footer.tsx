@@ -13,8 +13,8 @@ export function SiteFooter() {
           <div>
             <Wordmark />
             <p className="mt-3 max-w-[46ch] text-sm text-paper/65">
-              Tickets are held by a public contract. Hosts cannot raise the price after the sale, resellers cannot
-              list above face value, and refunds on a cancelled show cannot be blocked.
+              The price stays fixed after a show is listed. If the host cancels, ticket holders and people on the
+              waitlist can ask for their payment back without waiting for the host.
             </p>
           </div>
 

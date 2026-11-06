@@ -37,7 +37,7 @@ const RING = 2 * Math.PI * 26;
 const checks = [
   "Ticket signed by Houseful",
   "Code signed by the holder's phone",
-  "Code is from the last 20 seconds",
+  "Code is recent",
   "Not handed back, not already in",
 ];
 
@@ -102,7 +102,7 @@ export function DoorDemo() {
       </div>
 
       <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">Door phone, no signal</p>
+        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">Door phone, synced before entry</p>
         <ul className="mt-3 space-y-2.5 font-mono text-[13px]">
           {checks.map((c, i) => (
             <motion.li
@@ -120,8 +120,8 @@ export function DoorDemo() {
         </ul>
         <motion.p
           className="mt-5 font-display text-[clamp(3.5rem,7vw,5rem)] font-black uppercase leading-none text-admit"
-          initial={reduce ? false : { opacity: 0, scale: 1.4 }}
-          whileInView={{ opacity: 1, scale: 1 }}
+          initial={reduce ? false : { opacity: 0 }}
+          whileInView={{ opacity: 1 }}
           viewport={{ once: true, amount: 1 }}
           transition={{ type: "spring", stiffness: 420, damping: 24, delay: 0.95 }}
           style={{ transformOrigin: "0% 50%" }}

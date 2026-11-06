@@ -4,9 +4,9 @@ import { motion, useReducedMotion, useScroll, useTransform, type MotionValue } f
 import { useRef } from "react";
 import { CheckIcon, CrossIcon, PersonCheckIcon, TicketIcon } from "@/components/icons";
 
-export const HOLDER = "0x2f9c…41ab";
-export const NEXT = "0x8b1e…07c2";
-export const FACE_VALUE = "₹1,499";
+export const HOLDER = "Fan A";
+export const NEXT = "Fan B";
+export const FACE_VALUE = "$18";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
@@ -55,10 +55,10 @@ export function IdentityDemo() {
 
       <dl className="mt-10 grid grid-cols-[minmax(0,11rem)_1fr] gap-x-6 gap-y-5 border-t border-ink/20 pt-5">
         <dt className="font-display text-2xl font-extrabold uppercase leading-none">Selfie Check</dt>
-        <dd className="text-sm text-ink-soft">Most shows. Enough to stop one person buying through many wallets.</dd>
+        <dd className="text-sm text-ink-soft">The person check requested by most sample shows.</dd>
         <dt className="font-display text-2xl font-extrabold uppercase leading-none text-stamp">Proof of Human</dt>
         <dd className="text-sm text-ink-soft">
-          Shows where demand is higher than the seats. World&apos;s strongest one-person guarantee.
+          Shows where demand is higher than the seats. A stronger person check from World.
         </dd>
       </dl>
     </div>
@@ -81,17 +81,17 @@ export function FaceValueDemo() {
       </p>
 
       <figure className="mt-8 rounded-[4px] bg-ink p-5 font-mono text-[13px] text-paper">
-        <figcaption className="text-[11px] uppercase tracking-[0.16em] text-paper/50">Calls on ticket 0417</figcaption>
+        <figcaption className="text-[11px] uppercase tracking-[0.16em] text-paper/50">What happens to ticket 0417</figcaption>
         <ol className="mt-4 space-y-4">
           <li className="grid grid-cols-[1fr_auto_3.5rem] gap-4">
-            <span>buy(0417)</span>
+            <span>Buy a ticket</span>
             <span>{FACE_VALUE}</span>
             <span className="text-right text-marigold">ok</span>
           </li>
           <li>
             <div className="relative grid grid-cols-[1fr_auto_3.5rem] gap-4 text-paper/75">
-              <span className="truncate">resale.buyListing(0417)</span>
-              <span>₹7,495</span>
+              <span className="truncate">Try to resell it</span>
+              <span>$90</span>
               <span />
               <motion.span
                 aria-hidden="true"
@@ -100,11 +100,11 @@ export function FaceValueDemo() {
               />
             </div>
             <motion.p className="mt-1.5 text-stamp" style={{ opacity: still(revert, 1), y: still(revertY, 0) }}>
-              reverted: SurrenderOnly()
+              Not allowed: tickets cannot be transferred
             </motion.p>
           </li>
           <li className="grid grid-cols-[1fr_auto_3.5rem] gap-4">
-            <span>surrender(0417)</span>
+            <span>Return a ticket</span>
             <span>{FACE_VALUE} back</span>
             <span className="text-right text-marigold">ok</span>
           </li>
@@ -115,11 +115,11 @@ export function FaceValueDemo() {
 }
 
 const queue = [
-  { id: "0x2f9c", before: "You", after: "Refunded" },
-  { id: "0x8b1e", before: "1st", after: "Holder" },
-  { id: "0xc430", before: "2nd", after: "1st" },
-  { id: "0x19fd", before: "3rd", after: "2nd" },
-  { id: "0x6a77", before: "4th", after: "3rd" },
+  { id: "Fan A", before: "You", after: "Refunded" },
+  { id: "Fan B", before: "1st", after: "Holder" },
+  { id: "Fan C", before: "2nd", after: "1st" },
+  { id: "Fan D", before: "3rd", after: "2nd" },
+  { id: "Fan E", before: "4th", after: "3rd" },
 ];
 
 export function HandBackDemo() {
@@ -170,19 +170,19 @@ export function HandBackDemo() {
         className="mt-5 rounded-[4px] bg-paper-deep px-4 py-3 font-mono text-[12px] leading-relaxed"
         style={{ opacity: still(tx, 1) }}
       >
-        surrender(0417): {FACE_VALUE} back to 0x2f9c, seat to 0x8b1e, paid from 0x8b1e&apos;s escrow.
-        <span className="block text-muted">One transaction.</span>
+        {FACE_VALUE} goes back to Fan A. Fan B gets the seat, using the payment they made when they joined the waitlist.
+        <span className="block text-muted">Both happen together.</span>
       </motion.p>
     </div>
   );
 }
 
 const refundLog: { call: string; by: string; result: string; ok: boolean | null }[] = [
-  { call: "cancelEvent()", by: "Host", result: "Show cancelled", ok: null },
-  { call: "claimRefund()", by: "0x2f9c", result: `${FACE_VALUE} paid`, ok: true },
-  { call: "claimRefund()", by: "0x8b1e", result: `${FACE_VALUE} paid`, ok: true },
-  { call: "claimRefund()", by: "0xc430, waitlist", result: `${FACE_VALUE} escrow back`, ok: true },
-  { call: "withdrawProceeds()", by: "Host", result: "reverted: EventIsCancelled", ok: false },
+  { call: "Cancel the show", by: "Host", result: "Show cancelled", ok: null },
+  { call: "Ask for a refund", by: "Fan A", result: `${FACE_VALUE} paid`, ok: true },
+  { call: "Ask for a refund", by: "Fan B", result: `${FACE_VALUE} paid`, ok: true },
+  { call: "Ask for a refund", by: "Fan C, waitlist", result: `${FACE_VALUE} returned`, ok: true },
+  { call: "Ask for host payout", by: "Host", result: "Not paid: show cancelled", ok: false },
 ];
 
 export function RefundDemo() {
@@ -217,7 +217,7 @@ export function RefundDemo() {
         ))}
       </ol>
       <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-        No function pauses, delays or blocks a refund.
+        Fans ask for their own refunds. The host does not approve each one.
       </p>
     </figure>
   );

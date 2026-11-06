@@ -43,7 +43,7 @@ async function HostContent({ params }: Pick<PageProps<"/h/[slug]">, "params">) {
     <>
       <SiteHeader city={home} />
 
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <section className="mx-auto grid max-w-[1320px] gap-10 px-5 pb-14 pt-12 md:grid-cols-[minmax(0,7fr)_minmax(0,4fr)] md:gap-16 md:px-8 md:pt-20">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted">

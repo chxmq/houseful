@@ -12,11 +12,11 @@ export const metadata: Metadata = { title: "Host a show" };
 const promises = [
   {
     title: "Your price stays your price",
-    body: "Tickets sell at the face value you set and can only be handed back, never resold. There is no second market to lose money to.",
+    body: "Tickets keep the price you set. Holders can return them through the waitlist, but cannot send them to another wallet.",
   },
   {
     title: "One ticket per person",
-    body: "Every buyer verifies they are a unique human with World ID. Bots and bulk buyers cannot hold your room.",
+    body: "Every buyer verifies they are a unique human with World ID. A person check helps limit repeat buying across wallets.",
   },
   {
     title: "A line nobody can cut",

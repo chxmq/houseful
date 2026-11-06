@@ -9,7 +9,7 @@ import { SiteHeader } from "@/components/site-header";
 export const metadata: Metadata = {
   title: "How it works",
   description:
-    "Follow one ticket from sale to door: one verified person, face value forever, resell at face value to the waitlist, a door code that works offline, and refunds nobody can block.",
+    "Follow one ticket from sale to door: one person, a fixed price, returns to the waitlist, door codes and cancelled-show refunds.",
 };
 
 const contents = [
@@ -23,11 +23,11 @@ const contents = [
 const limits = [
   {
     title: "Someone can still be paid to queue.",
-    body: "A verified person can be paid to buy a ticket and go. With no on-chain resale margin there is little profit to share, though someone could still sell the phone's wallet key off-platform.",
+    body: "Someone can still pay another person to buy and attend, or buy access to their phone or wallet outside this app. A person check does not prevent those arrangements.",
   },
   {
     title: "The waitlist is first come, first served.",
-    body: "Whoever joins first gets the next seat that comes back. It is not a lottery and it does not know who the bigger fan is. It is a queue anyone can read, and nobody can cut it.",
+    body: "Whoever joins first gets the next seat that comes back. It is not a lottery and it does not know who the bigger fan is. People can check the order of the line.",
   },
 ];
 
@@ -36,7 +36,7 @@ export default function HowItWorksPage() {
     <>
       <SiteHeader />
 
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <section className="mx-auto grid max-w-[1320px] gap-12 px-5 pb-16 pt-12 md:px-8 md:pt-20 lg:grid-cols-[minmax(0,8fr)_minmax(0,4fr)] lg:items-end">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted">How it works</p>
@@ -50,9 +50,8 @@ export default function HowItWorksPage() {
           </div>
           <div className="lg:pb-4">
             <p className="text-lg leading-relaxed text-ink-soft">
-              Houseful is a set of rules written into a public contract. Here is what they do to one ticket: The Last
-              Local at NSCI Dome, ₹1,499, from the moment it is bought to the moment its holder walks in, and what
-              happens if the show never does.
+              Follow a sample ticket priced at $18 in test USDT: buying it, returning it, showing it at the door and
+              asking for a refund if the show is cancelled. These examples are for testing, not real admission.
             </p>
             <ol className="mt-8 border-t border-ink/20">
               {contents.map((c) => (
@@ -102,10 +101,10 @@ export default function HowItWorksPage() {
             <li>
               <RuleReveal>
                 <Link
-                  href="/mumbai"
+                  href="/cities"
                   className="flex items-end justify-between gap-6 py-6 font-display text-[clamp(2.75rem,8vw,7rem)] font-black uppercase leading-[0.85]"
                 >
-                  See what&apos;s on in Mumbai
+                  Find your city
                   <ArrowRight size={56} className="mb-2 hidden shrink-0 text-stamp md:block" />
                 </Link>
               </RuleReveal>
@@ -116,7 +115,7 @@ export default function HowItWorksPage() {
                   href="/host"
                   className="flex items-end justify-between gap-6 py-6 font-display text-[clamp(2.75rem,8vw,7rem)] font-black uppercase leading-[0.85] text-ink-soft"
                 >
-                  Host a show on these rules
+                  List a show
                   <ArrowRight size={56} className="mb-2 hidden shrink-0 md:block" />
                 </Link>
               </RuleReveal>
