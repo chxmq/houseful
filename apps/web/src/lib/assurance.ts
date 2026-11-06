@@ -36,7 +36,10 @@ export function worldActionFor(eventId: string) {
   return `ticket:${eventId}`;
 }
 
-/** World ID action that proves a person for fan or host login. */
-export function accountActionFor(kind: "fan" | "host") {
-  return `account:${kind}`;
+/** Single World ID action for fan login. Account id is the nullifier. */
+export const HOUSEFUL_LOGIN_ACTION = "houseful-login";
+
+export function credentialMeets(have: string, need: Assurance): boolean {
+  if (need === "selfie") return have === "selfie" || have === "document" || have === "orb";
+  return have === "document" || have === "orb";
 }

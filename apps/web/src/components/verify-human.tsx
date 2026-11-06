@@ -27,7 +27,7 @@ type WorldRequest = {
 };
 
 export type VerifyFailure = {
-  kind: "no-credential" | "cancelled" | "already-holds" | "rejected" | "unavailable";
+  kind: "no-credential" | "cancelled" | "already-holds" | "rejected" | "unavailable" | "signin";
   message: string;
 };
 
@@ -65,6 +65,15 @@ function failureFromIdkit(code: IDKitErrorCodes): VerifyFailure {
   }
 }
 
+function failureFromApi(data: { code?: string; error?: string }): VerifyFailure {
+  if (data.code === "already-holds") return { kind: "already-holds", message: data.error ?? "Already holds a place." };
+  if (data.code === "weak-credential" || data.code === "credential_unavailable") {
+    return { kind: "no-credential", message: data.error ?? "Credential is not enough for this show." };
+  }
+  if (data.code === "signin") return { kind: "signin", message: data.error ?? "Sign in with World ID first." };
+  return { kind: "rejected", message: data.error ?? "The proof did not check out." };
+}
+
 export function VerifyHuman({
   eventId,
   wallet,
@@ -80,19 +89,44 @@ export function VerifyHuman({
   const [busy, setBusy] = useState(false);
   const settled = useRef(false);
 
+  async function trySessionAttest(): Promise<"ok" | "fallback" | "failed"> {
+    const res = await fetch("/api/attest", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ eventId, wallet, purpose }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      onVerified(data as Attestation);
+      return "ok";
+    }
+    // No fan session, or the show needs a stronger credential than login stored: open World at checkout.
+    if (res.status === 401 || data.code === "signin" || data.code === "weak-credential") {
+      return "fallback";
+    }
+    onFailed(failureFromApi(data));
+    return "failed";
+  }
+
+  async function startWorld() {
+    const res = await fetch("/api/world/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ eventId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    setRequest(data);
+    settled.current = false;
+    setOpen(true);
+  }
+
   async function start() {
     setBusy(true);
     try {
-      const res = await fetch("/api/world/request", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ eventId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setRequest(data);
-      settled.current = false;
-      setOpen(true);
+      const session = await trySessionAttest();
+      if (session === "ok" || session === "failed") return;
+      await startWorld();
     } catch (err) {
       onFailed({ kind: "unavailable", message: (err as Error).message || "World ID is not reachable right now." });
     } finally {
@@ -109,15 +143,9 @@ export function VerifyHuman({
     });
     const data = await res.json();
     if (!res.ok) {
-      const failure: VerifyFailure =
-        data.code === "already-holds"
-          ? { kind: "already-holds", message: data.error }
-          : data.code === "weak-credential" || data.code === "credential_unavailable"
-            ? { kind: "no-credential", message: data.error }
-            : { kind: "rejected", message: data.error ?? "The proof did not check out." };
       // Resolve the host check without throwing. IDKit treats a thrown error as
       // failed_by_host_app and replaces our already-holds / weak-credential copy.
-      onFailed(failure);
+      onFailed(failureFromApi(data));
       return;
     }
     onVerified(data as Attestation);
@@ -134,7 +162,7 @@ export function VerifyHuman({
         className={`inline-flex w-full items-center justify-center gap-3 rounded-full bg-stamp px-6 py-4 text-base font-semibold text-paper shadow-[0_12px_28px_-14px_rgba(226,64,27,0.9)] transition disabled:opacity-60 ${className}`}
       >
         <PersonCheckIcon />
-        {busy ? "Opening World ID" : label}
+        {busy ? "Checking" : label}
       </button>
 
       {request ? (

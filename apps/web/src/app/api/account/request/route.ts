@@ -1,16 +1,16 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
-import { accountActionFor } from "@/lib/assurance";
-import { LOGIN_CHALLENGE_COOKIE, newLoginChallenge } from "@/server/auth/store";
+import { HOUSEFUL_LOGIN_ACTION } from "@/lib/assurance";
+import { LOGIN_CHALLENGE_COOKIE, newChallenge } from "@/server/auth/store";
 import { createWorldRequest } from "@/server/world";
 
-const body = z.object({ kind: z.enum(["fan", "host"]) });
+const body = z.object({ kind: z.literal("fan").default("fan") });
 
 export async function POST(req: Request) {
-  const parsed = body.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return Response.json({ error: "Say whether this is a fan or host login." }, { status: 400 });
+  const parsed = body.safeParse((await req.json().catch(() => ({}))) ?? {});
+  if (!parsed.success) return Response.json({ error: "Fan login only uses World ID." }, { status: 400 });
 
-  const challenge = newLoginChallenge();
+  const challenge = newChallenge();
   const jar = await cookies();
   jar.set(LOGIN_CHALLENGE_COOKIE, challenge, {
     httpOnly: true,
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   });
 
   try {
-    const request = createWorldRequest(accountActionFor(parsed.data.kind));
+    const request = createWorldRequest(HOUSEFUL_LOGIN_ACTION);
     return Response.json({ ...request, challenge });
   } catch (err) {
     return Response.json({ error: (err as Error).message }, { status: 500 });

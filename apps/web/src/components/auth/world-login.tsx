@@ -20,7 +20,6 @@ type WorldRequest = {
 };
 
 type WorldLoginProps = {
-  kind: "fan" | "host";
   next?: string;
   label?: string;
 };
@@ -41,14 +40,14 @@ function messageFor(code: IDKitErrorCodes): string {
   }
 }
 
-export function WorldLogin({ kind, next, label }: WorldLoginProps) {
+export function WorldLogin({ next = "/account", label = "Sign in with World ID" }: WorldLoginProps) {
   const router = useRouter();
   const [request, setRequest] = useState<WorldRequest | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const settled = useRef(false);
-  const challenge = useRef<string>("");
+  const challenge = useRef("");
 
   async function start() {
     setBusy(true);
@@ -57,7 +56,7 @@ export function WorldLogin({ kind, next, label }: WorldLoginProps) {
       const res = await fetch("/api/account/request", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ kind }),
+        body: JSON.stringify({ kind: "fan" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not start World ID.");
@@ -77,7 +76,7 @@ export function WorldLogin({ kind, next, label }: WorldLoginProps) {
     const res = await fetch("/api/account/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind, result }),
+      body: JSON.stringify({ result }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -85,11 +84,11 @@ export function WorldLogin({ kind, next, label }: WorldLoginProps) {
       return;
     }
     setOpen(false);
-    router.replace(next || (kind === "host" ? "/host" : "/account"));
+    router.replace(next);
     router.refresh();
   }
 
-  const signal = request ? `houseful:login:${kind}:${challenge.current}` : "";
+  const signal = request ? `houseful:login:${challenge.current}` : "";
   const preset = selfieCheck({ signal });
 
   return (
@@ -101,7 +100,7 @@ export function WorldLogin({ kind, next, label }: WorldLoginProps) {
         className="inline-flex w-full items-center justify-center gap-3 rounded-full bg-stamp px-6 py-4 text-base font-semibold text-paper disabled:opacity-60"
       >
         <PersonCheckIcon />
-        {busy ? "Opening World ID" : label ?? (kind === "host" ? "Sign in as host" : "Sign in with World ID")}
+        {busy ? "Opening World ID" : label}
       </button>
       {error ? <p className="mt-3 text-sm font-medium text-reject">{error}</p> : null}
 

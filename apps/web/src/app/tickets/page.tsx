@@ -4,11 +4,13 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { TicketWallet, type WalletEvent } from "@/components/ticket-wallet";
 import { WalletBackup } from "@/components/wallet-backup";
+import { requireFan } from "@/server/auth/session";
 import { cityEventsForWallet } from "@/server/queries";
 
 export const metadata: Metadata = { title: "Your tickets" };
 
 export default async function TicketsPage() {
+  await requireFan("/tickets");
   const events = await cityEventsForWallet("mumbai");
   const onChain: WalletEvent[] = events
     .filter((e) => e.chainEventId != null)
@@ -30,8 +32,8 @@ export default async function TicketsPage() {
           <RiseText text="Your tickets" />
         </h1>
         <p className="mt-4 max-w-[52ch] text-ink-soft">
-          Show the live code at the door. It changes every 20 seconds and is signed by this phone. A screenshot may work
-          on a fresh scanner for one or two rotations (about 20 to 40 seconds) until the window moves on.
+          Show the live code at the door. It changes every 20 seconds. Once a scanner has synced, older codes stop
+          working there. A screenshot can still work for one or two rotations on a scanner that has not seen it yet.
         </p>
         <div className="mt-12">
           <TicketWallet events={onChain} />

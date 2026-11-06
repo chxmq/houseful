@@ -15,6 +15,7 @@ import {
 
 export const SESSION_COOKIE = "hf_session";
 export const LOGIN_CHALLENGE_COOKIE = "hf_login_chal";
+export const HOST_CHALLENGE_COOKIE = "hf_host_chal";
 /** Sessions last 30 days. */
 export const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
@@ -49,41 +50,71 @@ function toSummary(row: Account): AccountSummary {
   };
 }
 
-export function newLoginChallenge(): string {
+export function newChallenge(): string {
   return randomBytes(24).toString("hex");
 }
 
-export function loginSignal(kind: AccountKind, challenge: string): string {
-  return `houseful:login:${kind}:${challenge}`;
+/** Fan login: IDKit signal bound to a one-time challenge. */
+export function fanLoginSignal(challenge: string): string {
+  return `houseful:login:${challenge}`;
 }
 
-/** Find or create the account for this World ID nullifier and kind. */
-export async function upsertAccountByNullifier(
+export function hostLoginMessage(challenge: string): string {
+  return `Houseful host sign-in\nChallenge: ${challenge}\nThis proves you control the host wallet.`;
+}
+
+/**
+ * Fan account: primary key and nullifier are the World ID nullifier.
+ * Host account: primary key is the wallet address; nullifier column stores the same address.
+ */
+export async function upsertFanAccount(
   database: Database,
-  input: { kind: AccountKind; nullifier: string; credential: Credential },
+  input: { nullifier: string; credential: Credential },
 ): Promise<{ account: AccountSummary; created: boolean }> {
   const nullifier = input.nullifier.trim().toLowerCase();
-  const existing = await database
-    .select()
-    .from(accounts)
-    .where(and(eq(accounts.kind, input.kind), eq(accounts.nullifier, nullifier)))
-    .limit(1);
+  const existing = await database.select().from(accounts).where(eq(accounts.id, nullifier)).limit(1);
   if (existing[0]) {
+    if (existing[0].kind !== "fan") throw new Error("This World ID is already a host account.");
+    if (existing[0].credential !== input.credential) {
+      await database.update(accounts).set({ credential: input.credential }).where(eq(accounts.id, nullifier));
+      return { account: toSummary({ ...existing[0], credential: input.credential }), created: false };
+    }
     return { account: toSummary(existing[0]), created: false };
   }
-
-  // One World ID backs one account of this kind. If it already owns the other kind, that is fine.
-  const id = newId();
   const now = Math.floor(Date.now() / 1000);
   await database.insert(accounts).values({
-    id,
-    kind: input.kind,
+    id: nullifier,
+    kind: "fan",
     nullifier,
     credential: input.credential,
     createdAt: now,
   });
   return {
-    account: { id, kind: input.kind, nullifier, credential: input.credential, createdAt: now },
+    account: { id: nullifier, kind: "fan", nullifier, credential: input.credential, createdAt: now },
+    created: true,
+  };
+}
+
+export async function upsertHostAccount(
+  database: Database,
+  wallet: `0x${string}`,
+): Promise<{ account: AccountSummary; created: boolean }> {
+  const id = wallet.toLowerCase();
+  const existing = await database.select().from(accounts).where(eq(accounts.id, id)).limit(1);
+  if (existing[0]) {
+    if (existing[0].kind !== "host") throw new Error("This wallet is already a fan account.");
+    return { account: toSummary(existing[0]), created: false };
+  }
+  const now = Math.floor(Date.now() / 1000);
+  await database.insert(accounts).values({
+    id,
+    kind: "host",
+    nullifier: id,
+    credential: "device",
+    createdAt: now,
+  });
+  return {
+    account: { id, kind: "host", nullifier: id, credential: "device", createdAt: now },
     created: true,
   };
 }
@@ -134,12 +165,16 @@ export async function linkWallet(
   input: { accountId: string; address: `0x${string}`; kind: WalletKind; label?: string },
 ): Promise<WalletRow> {
   const address = input.address.toLowerCase() as `0x${string}`;
-  const id = newId();
-  const now = Math.floor(Date.now() / 1000);
-  const existing = await database
+  const existingSame = await database
     .select()
     .from(wallets)
-    .where(eq(wallets.accountId, input.accountId));
+    .where(and(eq(wallets.accountId, input.accountId), eq(wallets.address, address)))
+    .limit(1);
+  if (existingSame[0]) return existingSame[0];
+
+  const id = newId();
+  const now = Math.floor(Date.now() / 1000);
+  const existing = await database.select().from(wallets).where(eq(wallets.accountId, input.accountId));
   const makeActive = existing.length === 0;
   if (makeActive) {
     await database.update(wallets).set({ active: false }).where(eq(wallets.accountId, input.accountId));

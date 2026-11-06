@@ -1,19 +1,18 @@
 import type { IDKitResult } from "@worldcoin/idkit";
 import { cookies } from "next/headers";
 import { z } from "zod";
-import { accountActionFor } from "@/lib/assurance";
+import { HOUSEFUL_LOGIN_ACTION } from "@/lib/assurance";
 import { startSession } from "@/server/auth/session";
 import {
   LOGIN_CHALLENGE_COOKIE,
-  loginSignal,
-  upsertAccountByNullifier,
   db,
+  fanLoginSignal,
+  upsertFanAccount,
 } from "@/server/auth/store";
 import { recordVerification } from "@/server/humans";
 import { verifyWorldProof, WorldVerificationError } from "@/server/world";
 
 const body = z.object({
-  kind: z.enum(["fan", "host"]),
   result: z.custom<IDKitResult>((v) => typeof v === "object" && v !== null),
 });
 
@@ -29,13 +28,13 @@ export async function POST(req: Request) {
   const challenge = jar.get(LOGIN_CHALLENGE_COOKIE)?.value;
   if (!challenge) return fail(400, "stale-challenge", "Start World ID again. The login challenge expired.");
 
-  const { kind, result } = parsed.data;
-  const action = accountActionFor(kind);
-  const signal = loginSignal(kind, challenge);
-
   let human;
   try {
-    human = await verifyWorldProof(result, { action, signal, assurance: "selfie" });
+    human = await verifyWorldProof(parsed.data.result, {
+      action: HOUSEFUL_LOGIN_ACTION,
+      signal: fanLoginSignal(challenge),
+      assurance: "selfie",
+    });
   } catch (err) {
     if (err instanceof WorldVerificationError) {
       const status = err.code === "world-unreachable" ? 503 : err.code === "weak-credential" ? 403 : 422;
@@ -48,24 +47,24 @@ export async function POST(req: Request) {
   await recordVerification({
     nullifier: nullifierHex,
     credential: human.credential,
-    action,
+    action: HOUSEFUL_LOGIN_ACTION,
     purpose: "login",
     environment: human.environment,
   });
 
-  const { account, created } = await upsertAccountByNullifier(db, {
-    kind,
-    nullifier: nullifierHex,
-    credential: human.credential,
-  });
+  let account;
+  try {
+    ({ account } = await upsertFanAccount(db, { nullifier: nullifierHex, credential: human.credential }));
+  } catch (err) {
+    return fail(409, "account-conflict", (err as Error).message);
+  }
 
   await startSession(account.id);
   jar.delete(LOGIN_CHALLENGE_COOKIE);
 
   return Response.json({
     ok: true,
-    created,
-    kind: account.kind,
+    accountId: account.id,
     credential: account.credential,
   });
 }

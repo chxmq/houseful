@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 const reasons: Record<string, string> = {
   signin: "Sign in with World ID to continue.",
-  "host-account": "That account is for hosts. Sign in here as a fan, or open the host console.",
+  "host-account": "That session is a host wallet. Sign in here as a fan.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
@@ -32,11 +32,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">Fan</p>
         <h1 className="mt-3 font-display text-5xl font-black uppercase leading-none">Sign in</h1>
         <p className="mt-4 max-w-prose text-ink-soft">
-          Your World ID is the account. No password. One human, one place to keep tickets and wallets.
+          Your World ID is the account. No email, no password. One human, one place to keep tickets and wallets.
         </p>
         {reason && reasons[reason] ? <p className="mt-4 text-sm font-medium">{reasons[reason]}</p> : null}
         <div className="mt-8">
-          <WorldLogin kind="fan" next={next} />
+          <WorldLogin next={next} />
         </div>
         <p className="mt-8 text-sm text-ink-soft">
           Listing a show?{" "}

@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { WorldLogin } from "@/components/auth/world-login";
+import { HostWalletLogin } from "@/components/auth/host-wallet-login";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getSession } from "@/server/auth/session";
 
 export const metadata: Metadata = {
   title: "Host sign in",
-  description: "Sign in with World ID to list shows and withdraw proceeds.",
+  description: "Sign in with your host wallet to list shows and withdraw proceeds.",
   robots: { index: false },
 };
 
 const reasons: Record<string, string> = {
-  signin: "Sign in with World ID to open the host console.",
-  "fan-account": "That account is for fans. Sign in here as a host.",
+  signin: "Sign the host challenge with your wallet.",
+  "fan-account": "That session is a fan World ID. Sign in here with the host wallet.",
 };
 
 export default async function HostLoginPage({ searchParams }: PageProps<"/host/login">) {
@@ -32,11 +32,11 @@ export default async function HostLoginPage({ searchParams }: PageProps<"/host/l
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">Host</p>
         <h1 className="mt-3 font-display text-5xl font-black uppercase leading-none">Host sign in</h1>
         <p className="mt-4 max-w-prose text-ink-soft">
-          Same World ID idea, separate host account. Fans cannot open this console.
+          Hosts sign a message with the payout wallet. Fans use World ID on a separate login.
         </p>
         {reason && reasons[reason] ? <p className="mt-4 text-sm font-medium">{reasons[reason]}</p> : null}
         <div className="mt-8">
-          <WorldLogin kind="host" next={next} label="Sign in as host" />
+          <HostWalletLogin next={next} />
         </div>
         <p className="mt-8 text-sm text-ink-soft">
           Buying tickets?{" "}

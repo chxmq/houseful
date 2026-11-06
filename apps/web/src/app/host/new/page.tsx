@@ -6,6 +6,7 @@ import { ShowForm, type VenueOption } from "@/components/host/show-form";
 import { RiseText } from "@/components/motion/reveal";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { requireHost } from "@/server/auth/session";
 import { listVenues } from "@/server/catalog";
 
 export const metadata: Metadata = { title: "List a show" };
@@ -29,7 +30,8 @@ async function FormForToday() {
   return <ShowForm venues={venues} now={now} />;
 }
 
-export default function NewShowPage() {
+export default async function NewShowPage() {
+  await requireHost("/host/new");
   return (
     <>
       <SiteHeader city={{ slug: "mumbai", name: "Mumbai" }} />

@@ -1,10 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { endSession, getSession, requireFan, requireHost } from "./session";
-import { db } from "@/server/db/client";
-import { delinkWallet, linkWallet, listWallets, setActiveWallet } from "./store";
 import { isAddress } from "viem";
+import { db } from "@/server/db/client";
+import { walletHoldsLiveTicket } from "./live-tickets";
+import { endSession, getSession, requireFan, requireHost } from "./session";
+import { delinkWallet, linkWallet, listWallets, setActiveWallet } from "./store";
 
 export async function signOutAction(formData?: FormData): Promise<void> {
   const kind = formData?.get("kind") === "host" ? "host" : "fan";
@@ -37,7 +38,12 @@ export async function chooseWalletAction(formData: FormData): Promise<void> {
 export async function delinkWalletAction(formData: FormData): Promise<void> {
   const session = await requireFan();
   const walletId = String(formData.get("walletId") ?? "");
-  // Live-ticket check lands with the recover/ticket stream; refuse beyond ownership for now.
+  const linked = await listWallets(db, session.account.id);
+  const target = linked.find((w) => w.id === walletId);
+  if (!target) throw new Error("That wallet is not on this account.");
+  if (await walletHoldsLiveTicket(target.address as `0x${string}`)) {
+    throw new Error("That wallet still holds a live ticket. Resell at face value or wait until the show ends before delinking.");
+  }
   await delinkWallet(db, session.account.id, walletId);
   redirect("/account");
 }

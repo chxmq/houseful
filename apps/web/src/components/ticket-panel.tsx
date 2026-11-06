@@ -327,7 +327,14 @@ function FailureNext({ kind, assurance }: { kind: string; assurance: Assurance }
     return (
       <p className="mt-2 text-sm text-ink-soft">
         Each person gets one ticket or one waitlist place per show. If it is on another phone, open Houseful there. If
-        you cannot go, hand it back so the next person gets it.
+        you cannot go, resell at face value so the next person gets it.
+      </p>
+    );
+  }
+  if (kind === "signin") {
+    return (
+      <p className="mt-2 text-sm text-ink-soft">
+        Sign in with World ID once, then checkout reuses that proof for shows your credential covers.
       </p>
     );
   }
