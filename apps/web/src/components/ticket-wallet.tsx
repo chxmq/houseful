@@ -7,7 +7,7 @@ import { contractAddress, housefulAbi } from "@/lib/contract";
 import { deviceWallet, publicClient } from "@/lib/device-wallet";
 import { deviceDoorKey, doorKeyBytes32 } from "@/lib/door-key";
 import { formatInr, formatLongDate, formatTime, shortHex } from "@/lib/format";
-import { bindDoorKey, explainError, leaveWaitlist, surrenderTicket } from "@/lib/ticket-actions";
+import { bindDoorKey, claimRefund, explainError, leaveWaitlist, surrenderTicket } from "@/lib/ticket-actions";
 import { DoorCode } from "./door-code";
 import { ArrowRight, ReturnIcon } from "./icons";
 import { SplitFlap } from "./motion/split-flap";
@@ -24,8 +24,8 @@ export type WalletEvent = {
 };
 
 type Holding =
-  | { kind: "ticket"; event: WalletEvent; ticketId: number; generation: number; door: DoorBinding }
-  | { kind: "waiting"; event: WalletEvent; position: number; ahead: number };
+  | { kind: "ticket"; event: WalletEvent; ticketId: number; generation: number; door: DoorBinding; cancelled: boolean }
+  | { kind: "waiting"; event: WalletEvent; position: number; ahead: number; cancelled: boolean };
 
 /** Whether the ticket's door key on chain is this phone's key, another phone's, or not set. */
 type DoorBinding = "here" | "elsewhere" | "none";
@@ -43,6 +43,8 @@ async function readHoldings(events: WalletEvent[], wallet: `0x${string}`): Promi
         publicClient.readContract({ address, abi: housefulAbi, functionName: "ticketOf", args: [id, wallet] }),
         publicClient.readContract({ address, abi: housefulAbi, functionName: "waitlistPositionOf", args: [id, wallet] }),
       ]);
+      if (!held[0] && !waiting[0]) return null;
+      const info = await publicClient.readContract({ address, abi: housefulAbi, functionName: "getEventInfo", args: [id] });
       if (held[0]) {
         const [, , generation, doorKey] = await publicClient.readContract({
           address,
@@ -56,23 +58,20 @@ async function readHoldings(events: WalletEvent[], wallet: `0x${string}`): Promi
           ticketId: Number(held[1]),
           generation: Number(generation),
           door: doorKey === EMPTY_KEY ? "none" : doorKey.toLowerCase() === myKey ? "here" : "elsewhere",
+          cancelled: info.cancelled,
         } satisfies Holding;
       }
-      if (waiting[0]) {
-        const info = await publicClient.readContract({ address, abi: housefulAbi, functionName: "getEventInfo", args: [id] });
-        const span = waiting[1] > info.waitlistCursor ? waiting[1] - info.waitlistCursor : 0n;
-        const before = span
-          ? await publicClient.readContract({
-              address,
-              abi: housefulAbi,
-              functionName: "getWaitlist",
-              args: [id, info.waitlistCursor, span],
-            })
-          : [];
-        const ahead = before.filter((w) => w.active).length;
-        return { kind: "waiting", event, position: Number(waiting[1]), ahead } satisfies Holding;
-      }
-      return null;
+      const span = waiting[1] > info.waitlistCursor ? waiting[1] - info.waitlistCursor : 0n;
+      const before = span
+        ? await publicClient.readContract({
+            address,
+            abi: housefulAbi,
+            functionName: "getWaitlist",
+            args: [id, info.waitlistCursor, span],
+          })
+        : [];
+      const ahead = before.filter((w) => w.active).length;
+      return { kind: "waiting", event, position: Number(waiting[1]), ahead, cancelled: info.cancelled } satisfies Holding;
     }),
   );
   return rows.filter((r): r is Holding => r !== null).sort((a, b) => a.event.startsAt - b.event.startsAt);
@@ -194,6 +193,19 @@ function HeldTicket({
     }
   }
 
+  async function refund() {
+    setBusy(true);
+    setError(null);
+    try {
+      await claimRefund(event.chainEventId);
+      setResult(`${event.title} was cancelled. ${formatInr(event.priceInr)} is back in this phone's wallet.`);
+      setTorn(true);
+    } catch (err) {
+      setError(explainError(err));
+      setBusy(false);
+    }
+  }
+
   async function bind() {
     setBusy(true);
     try {
@@ -222,7 +234,20 @@ function HeldTicket({
         ]}
         serial={`HSF-${event.chainEventId}-${ticketId} · GEN ${holding.generation}`}
         stub={
-          holding.door === "here" ? (
+          holding.cancelled ? (
+            <div className="flex max-w-[17ch] flex-col items-center gap-3 text-center">
+              <p className="font-display text-2xl font-extrabold uppercase leading-none text-stamp">Cancelled</p>
+              <button
+                type="button"
+                onClick={refund}
+                disabled={busy || torn}
+                className="rounded-full bg-marigold px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+              >
+                {busy ? "Refunding" : `Claim ${formatInr(event.priceInr)}`}
+              </button>
+              {error ? <p className="text-xs text-paper/70">{error}</p> : null}
+            </div>
+          ) : holding.door === "here" ? (
             <DoorCode chainEventId={event.chainEventId} ticketId={ticketId} wallet={wallet} />
           ) : (
             <div className="flex max-w-[17ch] flex-col items-center gap-3 text-center">
@@ -245,7 +270,7 @@ function HeldTicket({
       />
 
       <div className="mt-4 max-w-[640px]">
-        {!confirming ? (
+        {holding.cancelled ? null : !confirming ? (
           <button
             type="button"
             onClick={() => setConfirming(true)}
@@ -295,7 +320,8 @@ function WaitingSpot({
   async function leave() {
     setBusy(true);
     try {
-      await leaveWaitlist(event.chainEventId, position);
+      if (holding.cancelled) await claimRefund(event.chainEventId);
+      else await leaveWaitlist(event.chainEventId, position);
       onChanged(`You left the waitlist for ${event.title}. ${formatInr(event.priceInr)} is back in your wallet.`);
     } catch (err) {
       setError(explainError(err));
@@ -325,7 +351,7 @@ function WaitingSpot({
           See the public line
         </Link>
         <button type="button" onClick={leave} disabled={busy} className="text-ink-soft underline underline-offset-4">
-          {busy ? "Leaving" : "Leave and get a refund"}
+          {busy ? "Leaving" : holding.cancelled ? `Show cancelled. Claim ${formatInr(event.priceInr)}` : "Leave and get a refund"}
         </button>
       </div>
     </li>

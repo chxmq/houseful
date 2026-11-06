@@ -123,6 +123,10 @@ export async function surrenderTicket(chainEventId: number, ticketId: number) {
   return { hash, to: ev.args.to as `0x${string}`, generation: Number(ev.args.generation) };
 }
 
+export async function claimRefund(chainEventId: number) {
+  return send("claimRefund", [BigInt(chainEventId)]);
+}
+
 export async function leaveWaitlist(chainEventId: number, position: number) {
   return send("leaveWaitlist", [BigInt(chainEventId), BigInt(position)]);
 }
