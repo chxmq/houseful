@@ -5,3 +5,5 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   esbuild: true
+  keccak: false
+  secp256k1: false
