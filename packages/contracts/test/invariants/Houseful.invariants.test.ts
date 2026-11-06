@@ -107,7 +107,17 @@ describe("seeded lifecycle invariants", function () {
         const waiting = await f.c.waitlistPositionOf(id, fan.address);
         const e = await f.c.getEventInfo(id);
         if (action === 0 && held.held) {
+          const queue = await f.c.getWaitlist(id, 0, e.waitlistLength);
+          const next = queue.find(waiter => waiter.active);
+          const key = ethers.id(`surrender:${seed}:${step}`);
+          await f.c.connect(fan).setDoorKey(id, held.ticketId, key);
+          const before = await f.c.getTicket(id, held.ticketId);
+          expect(before.doorKey).to.equal(key);
           await f.c.connect(fan).surrender(id, held.ticketId);
+          const after = await f.c.getTicket(id, held.ticketId);
+          expect(after.owner, "oldest active waiter receives the seat").to.equal(next?.wallet ?? ethers.ZeroAddress);
+          expect(after.generation).to.equal(before.generation + 1n);
+          expect(after.doorKey).to.equal(ethers.ZeroHash);
         } else if (action === 1 && waiting.waiting) {
           await f.c.connect(fan).leaveWaitlist(id, waiting.position);
         } else if (!held.held && !waiting.waiting) {
@@ -127,8 +137,13 @@ describe("seeded lifecycle invariants", function () {
             else await f.c.connect(fan).joinWaitlistWithEth(id, nullifier, a.deadline, a.sig, { value: ethers.parseEther("0.01") });
           } else if (action === 4 && e.sold > 0n) {
             const ticketId = pick(4);
-            const before = await f.c.getTicket(id, ticketId);
+            let before = await f.c.getTicket(id, ticketId);
             if (before.owner !== ethers.ZeroAddress) {
+              const previousOwner = f.fans.find(owner => owner.address === before.owner)!;
+              const key = ethers.id(`recover:${seed}:${step}`);
+              await f.c.connect(previousOwner).setDoorKey(id, ticketId, key);
+              before = await f.c.getTicket(id, ticketId);
+              expect(before.doorKey).to.equal(key);
               const a = await f.signed(fan, id, before.nullifier, Purpose.Recover);
               await f.c.connect(fan).recoverTicket(id, ticketId, before.nullifier, a.deadline, a.sig);
               const after = await f.c.getTicket(id, ticketId);
@@ -178,6 +193,8 @@ describe("seeded lifecycle invariants", function () {
     }
     const a = await f.signed(f.fans[5], 1, 101n, Purpose.Join);
     await f.c.connect(f.fans[5]).joinWaitlist(1, 101, a.deadline, a.sig);
+    const second = await f.signed(f.fans[6], 1, 102n, Purpose.Join);
+    await f.c.connect(f.fans[6]).joinWaitlist(1, 102, second.deadline, second.sig);
     const before = await f.c.getTicket(1, 0);
     await expect(f.c.connect(f.fans[0]).surrender(1, 0)).to.be.revertedWithCustomError(f.c, "WaitlistBacklog");
     expect(await f.c.getTicket(1, 0)).to.deep.equal(before);
@@ -186,6 +203,9 @@ describe("seeded lifecycle invariants", function () {
     await f.c.connect(f.fans[0]).surrender(1, 0);
     expect((await f.c.getTicket(1, 0)).seat).to.equal(before.seat);
     expect((await f.c.getTicket(1, 0)).owner).to.equal(f.fans[5].address);
+    expect((await f.c.waitlistPositionOf(1, f.fans[6].address)).waiting).to.equal(true);
+    await f.c.connect(f.fans[1]).surrender(1, 1);
+    expect((await f.c.getTicket(1, 1)).owner).to.equal(f.fans[6].address);
     await invariant(f);
   });
 });

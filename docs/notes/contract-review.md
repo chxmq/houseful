@@ -47,3 +47,7 @@ The random lifecycle suite starts with fully minted events to explore normal tur
 ## Limits
 
 This is a targeted review with deterministic randomized testing, not a formal proof. Exact-output payments with the supplied honest mock reconcile correctly across the tested traces. Reentry into protected money operations is blocked, but a dishonest router or token can violate solvency as shown above. No claim is made that arbitrary dependencies cannot trap funds. Live routing, deployment identity and network behavior require their separate checks.
+
+## Verification note
+
+The supplemental contract type check still fails in the existing `scripts/seed-local.ts:41`: the v2 event parameters omit `seated`. The production contract and that deployment script were left unchanged. The contract test command passes independently. The invariant suite additionally seeds nonzero door keys before recovery and surrender and checks FIFO promotion against the first active queue entry, including two competing waiters after a bounded scan.
