@@ -5,10 +5,11 @@
  * Both tests list a show of their own from a host phone and buy from another phone, so they do not touch seed data.
  */
 import { housefulAbi } from "@houseful/contracts";
+import { signInFan } from "../support/auth";
 import { test, expect } from "../support/fixtures";
 import { deviceWalletAddress } from "../support/page";
 import { buyTicket, choosePay, openShow, openTickets, pickSeat } from "./helpers";
-import { cancelHostedShow, listShow, withdrawHostedProceeds } from "./host";
+import { cancelHostedShow, hostPhone, listShow, withdrawHostedProceeds } from "./host";
 
 test.describe("cancel and withdraw", () => {
   test.describe("with motion allowed", () => {
@@ -16,10 +17,11 @@ test.describe("cancel and withdraw", () => {
     // phone asks for reduced motion, the default for these runs. waitlist-refund.spec.ts keeps that gap in view.
     test.use({ reducedMotion: "no-preference" });
 
-    test("the host cancels and the fan claims the refund in USDT", async ({ page, device, chain }) => {
-      const host = await device();
+    test("the host cancels and the fan claims the refund in USDT", async ({ page, world, device, chain }) => {
+      const host = await hostPhone(device);
       const show = await listShow(host.page, chain, { priceUsd: 9, capacity: 5 });
 
+      await signInFan(page, world);
       await openShow(page, show.slug);
       await pickSeat(page);
       await choosePay(page, "usdt");
@@ -44,11 +46,12 @@ test.describe("cancel and withdraw", () => {
     });
   });
 
-  test("after the show ends the host withdraws the proceeds in USDT", async ({ page, device, chain }) => {
+  test("after the show ends the host withdraws the proceeds in USDT", async ({ page, world, device, chain }) => {
     test.setTimeout(150_000);
-    const host = await device();
+    const host = await hostPhone(device);
     // A show that is over about half an hour from now, with one ticket sold.
     const show = await listShow(host.page, chain, { priceUsd: 9, capacity: 5, endsSoon: true });
+    await signInFan(page, world);
     await openShow(page, show.slug);
     await pickSeat(page);
     await choosePay(page, "usdt");

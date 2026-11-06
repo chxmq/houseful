@@ -3,23 +3,26 @@
  * the holder hands the seat back it moves to the first person in line in the same transaction.
  */
 import type { Page } from "@playwright/test";
+import { signInFan } from "../support/auth";
 import { SHOWS } from "../support/catalog";
 import { test, expect } from "../support/fixtures";
 import { deviceWalletAddress } from "../support/page";
 import { buyTicket, choosePay, handBack, joinWaitlist, openShow, openTickets, pickSeat } from "./helpers";
-import { listShow } from "./host";
+import { hostPhone, listShow } from "./host";
 
 /** The row of the public line that belongs to the phone looking at it, marked "you". */
 const myPlace = (page: Page) => page.getByRole("listitem").filter({ has: page.getByText("you", { exact: true }) });
 
 test.describe("waitlist and USDT refund", () => {
-  test("a fan joins the line of a sold out show and leaves it for a full refund", async ({ page, chain }) => {
+  test("a fan joins the line of a sold out show and leaves it for a full refund", async ({ page, world, chain }) => {
     const show = SHOWS.soldOut;
     const price = BigInt(show.priceUsd) * 1_000_000n;
     // The seed has moved if this is not the show the catalog says it is.
     expect((await chain.read.eventInfo(show.chainEventId)).metadataURI).toBe(`houseful:event/${show.slug}`);
     const escrowBefore = (await chain.read.ledger(show.chainEventId)).escrow;
 
+    // A sold out show asks for Proof of Human, which a Selfie Check sign-in does not cover, so joining still opens World.
+    await signInFan(page, world);
     await openShow(page, show.slug);
     await choosePay(page, "usdt");
     await joinWaitlist(page);
@@ -52,14 +55,16 @@ test.describe("waitlist and USDT refund", () => {
 
     test("when the holder hands the seat back it moves to the first in line and the holder is refunded", async ({
       page,
+      world,
       device,
       chain,
     }) => {
       test.setTimeout(150_000);
       // A show of its own with one seat, so the line starts empty and the fan is first in it.
-      const show = await listShow((await device()).page, chain, { capacity: 1, priceUsd: 6 });
+      const show = await listShow((await hostPhone(device)).page, chain, { capacity: 1, priceUsd: 6 });
 
       const holder = await device();
+      await signInFan(holder.page, holder.world);
       await openShow(holder.page, show.slug);
       await pickSeat(holder.page);
       await choosePay(holder.page, "usdt");
@@ -67,6 +72,7 @@ test.describe("waitlist and USDT refund", () => {
       const holderWallet = await deviceWalletAddress(holder.page);
 
       // The only seat is gone, so the fan joins the line.
+      await signInFan(page, world);
       await openShow(page, show.slug);
       await choosePay(page, "usdt");
       await joinWaitlist(page);
@@ -110,8 +116,9 @@ test.describe("waitlist and USDT refund", () => {
   // an expected failure, and once it is fixed the mark is not applied and the test passes. Then the tests above and
   // in cancel-withdraw.spec.ts no longer need to switch motion on.
   test("a hand-back is confirmed on a phone that asks for reduced motion", async ({ device, chain }) => {
-    const show = await listShow((await device()).page, chain, { capacity: 1, priceUsd: 6 });
+    const show = await listShow((await hostPhone(device)).page, chain, { capacity: 1, priceUsd: 6 });
     const holder = await device();
+    await signInFan(holder.page, holder.world);
     await openShow(holder.page, show.slug);
     await pickSeat(holder.page);
     await choosePay(holder.page, "usdt");

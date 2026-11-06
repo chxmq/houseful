@@ -3,18 +3,20 @@
  * a repeat, turns away a code that is too old, and goes on doing so with no network.
  */
 import { DOOR_PAYLOAD_LENGTH } from "@houseful/pass";
+import { signInFan } from "../support/auth";
 import { test, expect } from "../support/fixtures";
 import { deviceWalletAddress, expectNoHorizontalScroll } from "../support/page";
 import { answer, copyDoorCode, scan, syncDoor } from "./door";
 import { buyTicket, choosePay, openShow, openTickets, pickSeat } from "./helpers";
-import { listShow } from "./host";
+import { hostPhone, listShow } from "./host";
 
-test("the ticket shows its seat and a rotating code, and the door admits it once", async ({ page, context, device, chain }) => {
+test("the ticket shows its seat and a rotating code, and the door admits it once", async ({ page, world, context, device, chain }) => {
   test.setTimeout(150_000);
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 
-  // A seated show of its own, and a fan with seat 4.
-  const show = await listShow((await device()).page, chain, { seated: true, capacity: 10 });
+  // A seated show of its own, and a signed-in fan with seat 4. The door scanner is open to staff without an account.
+  const show = await listShow((await hostPhone(device)).page, chain, { seated: true, capacity: 10 });
+  await signInFan(page, world);
   await openShow(page, show.slug);
   await pickSeat(page, 4);
   await choosePay(page, "usdt");

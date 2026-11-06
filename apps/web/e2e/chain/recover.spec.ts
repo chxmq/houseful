@@ -6,18 +6,20 @@
  * for a brand new wallet proved with World ID, but no page calls it (ticket-actions.ts defines it, and the verify
  * route only signs buy, join and claim), so there is nothing to drive for that.
  */
+import { signInFan } from "../support/auth";
 import { test, expect } from "../support/fixtures";
 import { deviceWalletAddress, deviceWalletKey } from "../support/page";
 import { answer, copyDoorCode, scan, syncDoor } from "./door";
 import { buyTicket, choosePay, openShow, openTickets, pickSeat } from "./helpers";
-import { listShow } from "./host";
+import { hostPhone, listShow } from "./host";
 
-test("moving a ticket to a new phone stops the old code and admits the new one", async ({ page, context, device, chain }) => {
+test("moving a ticket to a new phone stops the old code and admits the new one", async ({ page, world, context, device, chain }) => {
   test.setTimeout(150_000);
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 
-  // The fan buys on the old phone and copies the code the door would be shown.
-  const show = await listShow((await device()).page, chain, { capacity: 5 });
+  // The fan signs in and buys on the old phone, and copies the code the door would be shown.
+  const show = await listShow((await hostPhone(device)).page, chain, { capacity: 5 });
+  await signInFan(page, world);
   await openShow(page, show.slug);
   await pickSeat(page);
   await choosePay(page, "usdt");
@@ -35,9 +37,10 @@ test("moving a ticket to a new phone stops the old code and admits the new one",
   const secret = (await page.locator("pre").innerText()).trim();
   expect(secret).toBe(await deviceWalletKey(page));
 
-  // The new phone has its own wallet and sees nothing, until it imports the old phone's.
-  const newPhone = await device();
+  // The new phone is the same person, signed in on it, with a wallet of its own. It sees nothing until it imports the old phone's.
+  const newPhone = await device({ person: world.person });
   await newPhone.context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await signInFan(newPhone.page, newPhone.world);
   await openTickets(newPhone.page);
   await expect(newPhone.page.getByText("Nothing booked yet")).toBeVisible();
   await newPhone.page.getByLabel("Import on this phone").fill(secret);

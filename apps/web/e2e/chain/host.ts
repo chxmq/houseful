@@ -1,12 +1,15 @@
 /**
- * The host's side, driven through the app: list a show on /host/new, then cancel it or take its proceeds on /host.
- * The listing and the host console both use the browser's built-in wallet, which the app's faucet funds.
+ * The host's side, driven through the app: sign in as a host, list a show on /host/new, then cancel it or take its
+ * proceeds on /host. /host and /host/new open only for a signed-in host, so the page must have gone through
+ * `hostPhone` (or `signInHost`) first. The host wallet signs the sign-in message and nothing else: the listing and the
+ * host console both use the browser's built-in wallet, which the app's faucet funds.
  */
 import { randomBytes } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import type { Address } from "viem";
+import { signInHost } from "../support/auth";
 import { deviceWalletAddress } from "../support/page";
-import type { Chain } from "../support/fixtures";
+import type { Chain, Device } from "../support/fixtures";
 
 export type ShowTerms = {
   seated?: boolean;
@@ -26,6 +29,13 @@ export type ListedShow = {
   chainEventId: number;
   host: Address;
 };
+
+/** Opens another phone and signs it in as a host, with an injected wallet of its own. */
+export async function hostPhone(device: () => Promise<Device>): Promise<Device> {
+  const phone = await device();
+  await signInHost(phone.page);
+  return phone;
+}
 
 /** The form takes its date and time in IST. */
 function istFields(unixSeconds: number) {

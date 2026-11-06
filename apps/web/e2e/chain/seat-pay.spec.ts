@@ -1,16 +1,19 @@
 /**
  * Done-means 6: pick a seat and pay in USDT, another fan pays in ETH through the swap, and a seat that was just
  * taken is refused in plain words. Each test lists a seated show of its own, so no test runs out of seats.
+ * A host phone lists it and each fan signs in with World ID first, as the app now requires.
  */
+import { signInFan } from "../support/auth";
 import { test, expect } from "../support/fixtures";
 import { deviceWalletAddress, expectNoHorizontalScroll } from "../support/page";
 import { buyTicket, choosePay, openShow, openTickets, pickSeat, refusal } from "./helpers";
-import { listShow } from "./host";
+import { hostPhone, listShow } from "./host";
 
 test.describe("seat and pay", () => {
-  test("a fan picks a seat and pays in USDT", async ({ page, device, chain }) => {
-    const show = await listShow((await device()).page, chain, { seated: true, capacity: 12 });
+  test("a fan picks a seat and pays in USDT", async ({ page, world, device, chain }) => {
+    const show = await listShow((await hostPhone(device)).page, chain, { seated: true, capacity: 12 });
 
+    await signInFan(page, world);
     await openShow(page, show.slug);
     await expectNoHorizontalScroll(page);
     await pickSeat(page, 7);
@@ -35,9 +38,10 @@ test.describe("seat and pay", () => {
     await expectNoHorizontalScroll(page);
   });
 
-  test("another fan pays in ETH through the swap", async ({ page, device, chain }) => {
-    const show = await listShow((await device()).page, chain, { seated: true, capacity: 12 });
+  test("another fan pays in ETH through the swap", async ({ page, world, device, chain }) => {
+    const show = await listShow((await hostPhone(device)).page, chain, { seated: true, capacity: 12 });
 
+    await signInFan(page, world);
     await openShow(page, show.slug);
     await pickSeat(page, 3);
     await choosePay(page, "eth");
@@ -57,9 +61,11 @@ test.describe("seat and pay", () => {
     expect((await chain.read.ledger(show.chainEventId)).proceeds).toBe(show.price);
   });
 
-  test("a seat that was just taken is refused in plain words", async ({ page, device, chain }) => {
-    const show = await listShow((await device()).page, chain, { seated: true, capacity: 12 });
+  test("a seat that was just taken is refused in plain words", async ({ page, world, device, chain }) => {
+    const show = await listShow((await hostPhone(device)).page, chain, { seated: true, capacity: 12 });
     const rival = await device();
+    await signInFan(page, world);
+    await signInFan(rival.page, rival.world);
 
     // The fan picks seat 5 while it is still free.
     await openShow(page, show.slug);
