@@ -576,6 +576,21 @@ describe("Houseful", () => {
       await expect(c.connect(mallory).setDoorKey(eventId, 0, key)).to.be.revertedWithCustomError(c, "NotTicketOwner");
       await expect(c.connect(alice).setDoorKey(eventId, 5, key)).to.be.revertedWithCustomError(c, "NotTicketOwner");
     });
+
+    it("moving to a new device revokes the old one's credentials", async () => {
+      const { c, alice, eventId } = await loadFixture(soldOutFixture);
+      const first = ethers.id("phone-1");
+      await c.connect(alice).setDoorKey(eventId, 0, first);
+      expect((await c.getTicket(eventId, 0)).generation).to.equal(0n);
+
+      await c.connect(alice).setDoorKey(eventId, 0, first);
+      expect((await c.getTicket(eventId, 0)).generation).to.equal(0n);
+
+      await c.connect(alice).setDoorKey(eventId, 0, ethers.id("phone-2"));
+      const t = await c.getTicket(eventId, 0);
+      expect(t.generation).to.equal(1n);
+      expect(t.doorKey).to.equal(ethers.id("phone-2"));
+    });
   });
 
   describe("cancellation and refunds", () => {

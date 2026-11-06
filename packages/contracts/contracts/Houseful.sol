@@ -320,9 +320,11 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     }
 
     /// @notice Registers the ed25519 public key of the device that shows the rotating door QR.
+    /// Replacing an existing key bumps the generation, so codes from the previous device stop working.
     function setDoorKey(uint256 eventId, uint256 ticketId, bytes32 doorKey) external {
         Ticket storage t = _tickets[eventId][ticketId];
         if (t.owner != msg.sender) revert NotTicketOwner();
+        if (t.doorKey != bytes32(0) && t.doorKey != doorKey) t.generation += 1;
         t.doorKey = doorKey;
         emit DoorKeySet(eventId, ticketId, msg.sender, doorKey);
     }
@@ -422,7 +424,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         v.proceedsWithdrawn = e.proceedsWithdrawn;
     }
 
-    /// @notice Ticket state. `generation` increases on every surrender or refund and revokes older
+    /// @notice Ticket state. `generation` increases on every surrender, refund or door key change and revokes older
     /// door credentials. A zero owner means the seat is in the returned pool or was refunded.
     function getTicket(
         uint256 eventId,
