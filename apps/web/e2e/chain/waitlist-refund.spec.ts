@@ -2,7 +2,7 @@
  * Done-means 8: sold-out show, join waitlist, holder hands back, seat moves,
  * refund arrives in USDT.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures";
 import { choosePay, desktop, handBack, openShow, openTickets, phone } from "./helpers";
 
 const SOLD_OUT = process.env.E2E_SOLD_OUT_SLUG ?? "chawl-no-9-prithvi";

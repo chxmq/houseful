@@ -2,7 +2,7 @@
  * Done-means 6: pick a seat, pay in USDT, another fan pays in ETH,
  * a just-taken seat is refused in plain words.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures";
 import { choosePay, desktop, expectSeatTakenMessage, openShow, phone, pickSeat, verifyAndBuy } from "./helpers";
 
 const FLAGSHIP = "the-last-local-nsci-dome";

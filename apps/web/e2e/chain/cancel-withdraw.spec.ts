@@ -2,7 +2,7 @@
  * Done-means 9: host cancels and fans refund themselves; after a show ends the
  * host withdraws proceeds in USDT.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures";
 import { desktop, openTickets, phone } from "./helpers";
 
 test.describe("cancel and withdraw", () => {

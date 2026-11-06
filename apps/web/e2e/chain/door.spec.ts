@@ -2,7 +2,7 @@
  * Done-means 7: ticket shows the seat and a rotating door code; door admits,
  * rejects a stale code and a repeat entry, including offline.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures";
 import { desktop, openShow, openTickets, phone, pickSeat, choosePay, verifyAndBuy } from "./helpers";
 
 const SLUG = process.env.E2E_DOOR_SLUG ?? "bijli-ka-bill-siddharth-kale";

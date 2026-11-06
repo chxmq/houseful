@@ -2,7 +2,7 @@
  * Done-means 10: ticket recovery moves a ticket to a new wallet; the old door
  * code stops working.
  */
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../support/fixtures";
 import { choosePay, desktop, openShow, openTickets, phone, pickSeat, verifyAndBuy } from "./helpers";
 
 const SLUG = process.env.E2E_RECOVER_SLUG ?? "tatkaar-ncpa";
