@@ -15,7 +15,7 @@ import {
   type PosterInk,
   type VenueKind,
 } from "../src/server/db/schema";
-import { inrToWei } from "../src/server/pricing";
+import { inrToWei } from "../src/lib/pricing";
 
 /** Unix seconds for a wall-clock time in IST (UTC+5:30). */
 function ist(year: number, month: number, day: number, hour: number, minute = 0) {

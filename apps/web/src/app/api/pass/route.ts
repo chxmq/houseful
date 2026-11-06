@@ -1,8 +1,8 @@
 import { issueCredential } from "@houseful/pass";
-import { createPublicClient, http, isAddress } from "viem";
+import { isAddress } from "viem";
 import { z } from "zod";
-import { activeChain } from "@/lib/chain";
 import { contractAddress, housefulAbi } from "@/lib/contract";
+import { serverChain } from "@/server/chain";
 import { doorEnv } from "@/server/env";
 
 const body = z.object({
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   if (!contractAddress) return Response.json({ error: "Houseful is not deployed on this network." }, { status: 503 });
 
   const env = doorEnv();
-  const chain = createPublicClient({ chain: activeChain, transport: http(env.RPC_URL) });
+  const chain = serverChain();
   const { chainEventId, ticketId } = parsed.data;
   const id = BigInt(chainEventId);
 

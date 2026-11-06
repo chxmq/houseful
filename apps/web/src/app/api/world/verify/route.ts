@@ -1,12 +1,11 @@
 import type { IDKitResult } from "@worldcoin/idkit";
-import { createPublicClient, http, isAddress } from "viem";
+import { isAddress } from "viem";
 import { z } from "zod";
 import { worldActionFor } from "@/lib/assurance";
-import { activeChain } from "@/lib/chain";
 import { contractAddress, housefulAbi } from "@/lib/contract";
 import { signAttestation } from "@/server/attest";
 import { getEvent } from "@/server/catalog";
-import { serverEnv } from "@/server/env";
+import { serverChain } from "@/server/chain";
 import { recordVerification } from "@/server/humans";
 import { verifyWorldProof, WorldVerificationError } from "@/server/world";
 
@@ -43,10 +42,8 @@ export async function POST(req: Request) {
     throw err;
   }
 
-  const env = serverEnv();
-  const chain = createPublicClient({ chain: activeChain, transport: http(env.RPC_URL) });
   if (contractAddress) {
-    const used = await chain.readContract({
+    const used = await serverChain().readContract({
       address: contractAddress,
       abi: housefulAbi,
       functionName: "nullifierUsed",
