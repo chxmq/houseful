@@ -10,7 +10,7 @@ export const desktop = { width: 1280, height: 800 };
 
 export async function openShow(page: Page, slug: string) {
   await page.goto(`/e/${slug}`);
-  await expect(page.getByText(/USDT|test USDT|Paid in/i).first()).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/\$\d+|Paid |Pay now|Pay with Ethereum/i).first()).toBeVisible({ timeout: 30_000 });
 }
 
 export async function pickSeat(page: Page, seatLabel?: string) {
@@ -29,7 +29,7 @@ export async function pickSeat(page: Page, seatLabel?: string) {
 }
 
 export async function choosePay(page: Page, method: "usdt" | "eth") {
-  const label = method === "usdt" ? /Pay with USDT/i : /Pay with ETH/i;
+  const label = method === "usdt" ? /Pay now/i : /Pay with Ethereum/i;
   const btn = page.getByRole("button", { name: label });
   if (await btn.isVisible().catch(() => false)) await btn.click();
 }

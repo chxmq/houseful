@@ -19,14 +19,12 @@ type SeatMapProps = {
  * Taken seats are read from the contract and refused in plain words.
  */
 export function SeatMap({ chainEventId, capacity, seated, value, onChange, disabled }: SeatMapProps) {
-  const [taken, setTaken] = useState<boolean[]>([]);
+  const [taken, setTaken] = useState<boolean[]>(() => (seated ? [] : []));
   const [error, setError] = useState<string | null>(null);
+  const showMap = seated && Boolean(contractAddress);
 
   useEffect(() => {
-    if (!seated || !contractAddress) {
-      setTaken([]);
-      return;
-    }
+    if (!showMap || !contractAddress) return;
     let cancelled = false;
     (async () => {
       const flags = await publicClient.readContract({
@@ -42,7 +40,7 @@ export function SeatMap({ chainEventId, capacity, seated, value, onChange, disab
     return () => {
       cancelled = true;
     };
-  }, [chainEventId, capacity, seated]);
+  }, [chainEventId, capacity, showMap]);
 
   if (!seated) {
     return (
@@ -99,7 +97,7 @@ export function SeatMap({ chainEventId, capacity, seated, value, onChange, disab
                         ? "bg-ink/10 text-ink/30"
                         : selected
                           ? "bg-ink text-paper"
-                          : "border border-ink/20 text-ink hover:border-ink/50"
+                          : "border border-ink/20 text-ink"
                     }`}
                   >
                     {cell.indexInRow}

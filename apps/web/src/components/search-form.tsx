@@ -52,7 +52,7 @@ export function SearchForm({ filters, cities, action = "/search", cityOnly = fal
           </select>
         </label>
         <label className="min-w-0 text-sm font-medium">
-          Maximum price (test USDT)
+          Maximum price
           <input className={control} type="number" name="maxPrice" min="0" step="0.000001" defaultValue={filters.maxPrice ?? ""} placeholder="Any price" inputMode="decimal" />
         </label>
         <label className="min-w-0 text-sm font-medium">

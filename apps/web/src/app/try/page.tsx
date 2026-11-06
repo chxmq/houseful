@@ -35,7 +35,7 @@ export default async function TryPage() {
         </h1>
         <p className="mt-4 max-w-[46ch] text-lg text-ink-soft">
           Scan, verify with the World ID simulator, pay face value on Unichain Sepolia, and open the rotating door code.
-          Test ETH and test USDT are topped up for you.
+          Demo funds are topped up for you on this phone.
         </p>
 
         <div className="mt-10 rounded-[4px] border border-ink/15 bg-paper-deep p-6 md:p-8">
@@ -64,8 +64,8 @@ export default async function TryPage() {
             choose the <span className="font-semibold text-ink">simulator</span> if you do not have World App.
           </li>
           <li>
-            <span className="font-semibold text-ink">3. Pay</span> in test USDT (or ETH). The faucet tops up the phone
-            wallet.
+            <span className="font-semibold text-ink">3. Pay</span> the face price. Use Pay now, or Pay with Ethereum if
+            you prefer.
           </li>
           <li>
             <span className="font-semibold text-ink">4. Open My tickets</span> for the live door code, then try{" "}

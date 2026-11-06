@@ -128,7 +128,7 @@ function HostedRow({
             value={
               meta
                 ? formatUsdt(meta.priceUsd * held)
-                : `${(Number(proceeds) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 0 })} USDT`
+                : formatUsdt(Number(proceeds) / 1e6)
             }
           />
         </dl>

@@ -193,7 +193,7 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
             These go on chain when you list. Nobody can change them afterwards, including you.
           </p>
           <div className="grid gap-5 sm:grid-cols-3">
-            <Field label="Face value, USDT">
+            <Field label="Face value">
               <NumberInput value={form.priceUsd} onChange={set("priceUsd")} min={0} max={100000} />
             </Field>
             <Field label="Seats" hint={venue ? `${venue.name} holds ${venue.capacity.toLocaleString("en-US")}` : undefined}>

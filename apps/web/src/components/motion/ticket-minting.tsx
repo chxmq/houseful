@@ -83,7 +83,7 @@ export function TicketMinting({ done, current, title, priceLabel, seatLabel }: T
                 </InkLine>
                 <InkLine ready={Boolean(seatLabel) && (done.includes("pay") || current === "pay")} delay={0.1}>
                   <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted">Seat</p>
-                  <p className="mt-0.5 text-sm font-medium">{seatLabel ?? "—"}</p>
+                  <p className="mt-0.5 text-sm font-medium">{seatLabel ?? "-"}</p>
                 </InkLine>
               </div>
 

@@ -64,7 +64,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
 
             <div className="flex flex-col justify-center">
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-paper/55">
-                <Link href={`/${e.citySlug}/c/${e.category}`} className="hover:text-paper">
+                <Link href={`/${e.citySlug}/c/${e.category}`} className="text-paper">
                   {categoryLabel[e.category] ?? e.category}
                 </Link>
                 {" · "}

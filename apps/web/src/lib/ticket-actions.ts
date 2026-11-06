@@ -52,8 +52,8 @@ const friendly: Record<string, string> = {
   NothingToRefund: "There is nothing to refund to this phone.",
   SeatTaken: "That seat was just taken. Pick another.",
   InvalidSeat: "That seat is not available for this show.",
-  SwapFailed: "Could not convert ETH to USDT for this purchase. Try paying in USDT instead.",
-  InsufficientEthForSwap: "Not enough ETH was sent to cover the ticket price.",
+  SwapFailed: "Could not convert Ethereum to cover this ticket. Try Pay now instead.",
+  InsufficientEthForSwap: "Not enough Ethereum was sent to cover the ticket price.",
 };
 
 export function explainError(err: unknown): string {
@@ -67,7 +67,7 @@ export function explainError(err: unknown): string {
       }
       return friendly[name] ?? `The contract refused: ${name || revert.shortMessage}`;
     }
-    if (/insufficient funds/i.test(err.message)) return "This wallet does not have enough test ETH for gas.";
+    if (/insufficient funds/i.test(err.message)) return "This wallet does not have enough Ethereum for network fees.";
     return err.shortMessage;
   }
   return (err as Error)?.message ?? "Something went wrong.";
@@ -79,7 +79,7 @@ function requireContract() {
 }
 
 function requireUsdt() {
-  if (!usdtAddr) throw new Error("Test USDT is not configured on this network yet.");
+  if (!usdtAddr) throw new Error("Settlement token is not configured on this network yet.");
   return usdtAddr;
 }
 
@@ -132,7 +132,7 @@ async function ensureUsdt(signer: ActionSigner, need: bigint) {
   if (balance >= need) return;
 
   if (signer.kind !== "device") {
-    throw new Error("This wallet needs test USDT. Use a faucet or the Houseful top-up on a device wallet.");
+    throw new Error("This wallet needs funds for the face price. Use a faucet or the Houseful top-up on a device wallet.");
   }
 
   const res = await fetch("/api/faucet", {
@@ -142,7 +142,7 @@ async function ensureUsdt(signer: ActionSigner, need: bigint) {
   });
   if (!res.ok) {
     const { error } = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(error ?? "Could not top up this wallet with test USDT.");
+    throw new Error(error ?? "Could not top up this wallet for the face price.");
   }
   const { usdtHash, hash } = (await res.json()) as { usdtHash?: Hex; hash?: Hex };
   const waitHash = usdtHash ?? hash;

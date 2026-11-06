@@ -131,7 +131,7 @@ export function VerifyHuman({
         type="button"
         onClick={start}
         disabled={busy}
-        className={`inline-flex w-full items-center justify-center gap-3 rounded-full bg-stamp px-6 py-4 text-base font-semibold text-paper shadow-[0_12px_28px_-14px_rgba(226,64,27,0.9)] transition hover:bg-stamp-deep disabled:opacity-60 ${className}`}
+        className={`inline-flex w-full items-center justify-center gap-3 rounded-full bg-stamp px-6 py-4 text-base font-semibold text-paper shadow-[0_12px_28px_-14px_rgba(226,64,27,0.9)] transition disabled:opacity-60 ${className}`}
       >
         <PersonCheckIcon />
         {busy ? "Opening World ID" : label}

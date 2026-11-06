@@ -33,7 +33,7 @@ export function SearchResults({ events, resetHref = "/search", allCitiesHref = "
                     <p className="mt-1 text-sm text-ink-soft">{event.venue.name} · {event.venue.area}</p>
                   </div>
                   <div className="md:text-right">
-                    <p className="font-mono">{formatUsdt(event.priceUsd)} <span className="text-xs text-muted">test USDT</span></p>
+                    <p className="font-mono">{formatUsdt(event.priceUsd)}</p>
                     <p className="mt-1 text-sm">{event.status === "sold_out" || event.sold >= event.capacity ? "Sold out · Waitlist" : event.status === "announced" ? "Announced" : "Tickets available"}</p>
                   </div>
                 </Link>

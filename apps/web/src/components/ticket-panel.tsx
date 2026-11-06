@@ -193,8 +193,8 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
 
                   {ethOk ? (
                     <div className="mb-4 flex flex-wrap gap-2">
-                      <PayChoice selected={pay === "usdt"} onClick={() => setPay("usdt")} label="Pay in USDT" />
-                      <PayChoice selected={pay === "eth"} onClick={() => setPay("eth")} label="Pay in ETH" />
+                      <PayChoice selected={pay === "usdt"} onClick={() => setPay("usdt")} label="Pay now" />
+                      <PayChoice selected={pay === "eth"} onClick={() => setPay("eth")} label="Pay with Ethereum" />
                     </div>
                   ) : null}
 

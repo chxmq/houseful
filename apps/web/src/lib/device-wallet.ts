@@ -47,7 +47,7 @@ export async function ensureFunded(address: `0x${string}`, needWei: bigint) {
   });
   if (!res.ok) {
     const { error } = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(error ?? "Could not top up this wallet with test ETH.");
+    throw new Error(error ?? "Could not top up this wallet for network fees.");
   }
   const { hash } = (await res.json()) as { hash: Hex };
   await publicClient.waitForTransactionReceipt({ hash });
