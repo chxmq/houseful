@@ -84,6 +84,10 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     bytes32 public constant ATTESTATION_TYPEHASH =
         keccak256("Attestation(uint256 eventId,uint256 nullifier,address wallet,uint8 purpose,uint256 deadline)");
 
+    /// @notice Most waitlist slots a surrender will step over looking for the next active waiter.
+    /// Longer runs of departed slots are cleared first with `advanceWaitlist`, which anyone can call.
+    uint256 public constant WAITLIST_SCAN_LIMIT = 64;
+
     address public verifier;
     uint256 public eventCount;
 
@@ -95,6 +99,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     mapping(uint256 eventId => mapping(address wallet => uint256)) private _waitPositionPlusOne;
     mapping(uint256 eventId => uint256[]) private _returnedIds;
     mapping(uint256 eventId => mapping(uint256 ticketId => uint256)) private _returnedIndexPlusOne;
+    mapping(bytes32 digest => bool) private _attestationSpent;
 
     event VerifierUpdated(address indexed previousVerifier, address indexed newVerifier);
     event EventCreated(
@@ -156,7 +161,9 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     error WalletHasTicket();
     error WalletOnWaitlist();
     error AttestationExpired();
+    error AttestationSpent();
     error InvalidAttestation();
+    error WaitlistBacklog();
 
     modifier onlyHost(uint256 eventId) {
         if (_existing(eventId).host != msg.sender) revert NotHost();
@@ -245,6 +252,18 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         bytes32 head = keccak256(abi.encode(e.waitlistHead, nullifier, msg.sender));
         e.waitlistHead = head;
         emit WaitlistJoined(eventId, position, nullifier, msg.sender, head);
+    }
+
+    /// @notice Moves the waitlist cursor past inactive slots so a later surrender does not hit
+    /// `WaitlistBacklog`. Anyone may call this; each call advances at most `WAITLIST_SCAN_LIMIT` slots.
+    function advanceWaitlist(uint256 eventId) external {
+        EventData storage e = _existing(eventId);
+        Waiter[] storage list = _waitlists[eventId];
+        uint256 len = list.length;
+        uint256 cursor = e.waitlistCursor;
+        uint256 stop = cursor + WAITLIST_SCAN_LIMIT < len ? cursor + WAITLIST_SCAN_LIMIT : len;
+        while (cursor < stop && !list[cursor].active) cursor++;
+        e.waitlistCursor = cursor;
     }
 
     /// @notice Leaves the waitlist and refunds the escrowed face value. Works at any time,
@@ -539,8 +558,10 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         if (_ticketIdPlusOne[eventId][msg.sender] != 0) revert WalletHasTicket();
         if (_waitPositionPlusOne[eventId][msg.sender] != 0) revert WalletOnWaitlist();
         bytes32 digest = attestationDigest(eventId, nullifier, msg.sender, purpose, deadline);
+        if (_attestationSpent[digest]) revert AttestationSpent();
         (address signer, ECDSA.RecoverError err, ) = ECDSA.tryRecover(digest, signature);
         if (err != ECDSA.RecoverError.NoError || signer != verifier) revert InvalidAttestation();
+        _attestationSpent[digest] = true;
         _nullifierUsed[eventId][nullifier] = true;
     }
 
@@ -556,7 +577,9 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         Waiter[] storage list = _waitlists[eventId];
         uint256 len = list.length;
         uint256 cursor = e.waitlistCursor;
-        while (cursor < len && !list[cursor].active) cursor++;
+        uint256 stop = cursor + WAITLIST_SCAN_LIMIT < len ? cursor + WAITLIST_SCAN_LIMIT : len;
+        while (cursor < stop && !list[cursor].active) cursor++;
+        if (cursor == stop && stop < len) revert WaitlistBacklog();
         found = cursor < len;
         position = cursor;
         e.waitlistCursor = found ? cursor + 1 : cursor;

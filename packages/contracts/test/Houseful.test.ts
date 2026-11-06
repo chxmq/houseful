@@ -169,6 +169,7 @@ describe("Houseful", () => {
         .sort();
       expect(mutating).to.deep.equal([
         "acceptOwnership",
+        "advanceWaitlist",
         "buy",
         "cancelEvent",
         "claimRefund",
@@ -414,6 +415,20 @@ describe("Houseful", () => {
         ]),
       );
     });
+
+    it("rejects a reused Join attestation after leaveWaitlist frees the nullifier", async () => {
+      const { c, carol, eventId, signed } = await loadFixture(soldOutFixture);
+      const { deadline, sig } = await signed(carol, N.carol, Purpose.Join);
+      await c.connect(carol).joinWaitlist(eventId, N.carol, deadline, sig, { value: FACE });
+      await c.connect(carol).leaveWaitlist(eventId, 0);
+      await expect(
+        c.connect(carol).joinWaitlist(eventId, N.carol, deadline, sig, { value: FACE }),
+      ).to.be.revertedWithCustomError(c, "AttestationSpent");
+      const fresh = await signed(carol, N.carol, Purpose.Join);
+      await expect(
+        c.connect(carol).joinWaitlist(eventId, N.carol, fresh.deadline, fresh.sig, { value: FACE }),
+      ).to.emit(c, "WaitlistJoined");
+    });
   });
 
   describe("surrender", () => {
@@ -470,6 +485,29 @@ describe("Houseful", () => {
         .to.emit(c, "WaitlistPromoted")
         .withArgs(eventId, 2n, 0n, erin.address);
       expect((await eventOf(c, eventId)).waitlistCursor).to.equal(3n);
+      await expectSolvent(c);
+    });
+
+    it("reverts WaitlistBacklog when more than WAITLIST_SCAN_LIMIT departed slots sit ahead, then advances and promotes", async () => {
+      const { c, alice, carol, eventId, joinAs, signed } = await loadFixture(soldOutFixture);
+      const limit = Number(await c.WAITLIST_SCAN_LIMIT());
+      const wallets: HardhatEthersSigner[] = [];
+      for (let i = 0; i < limit; i++) {
+        const w = ethers.Wallet.createRandom().connect(ethers.provider);
+        await alice.sendTransaction({ to: w.address, value: FACE * 2n });
+        wallets.push(w as unknown as HardhatEthersSigner);
+        const nullifier = 10_000n + BigInt(i);
+        const { deadline, sig } = await signed(w, nullifier, Purpose.Join);
+        await c.connect(w).joinWaitlist(eventId, nullifier, deadline, sig, { value: FACE });
+        await c.connect(w).leaveWaitlist(eventId, i);
+      }
+      await joinAs(carol, N.carol);
+      await expect(c.connect(alice).surrender(eventId, 0)).to.be.revertedWithCustomError(c, "WaitlistBacklog");
+      await c.advanceWaitlist(eventId);
+      expect((await eventOf(c, eventId)).waitlistCursor).to.equal(BigInt(limit));
+      await expect(c.connect(alice).surrender(eventId, 0))
+        .to.emit(c, "WaitlistPromoted")
+        .withArgs(eventId, BigInt(limit), 0n, carol.address);
       await expectSolvent(c);
     });
 
