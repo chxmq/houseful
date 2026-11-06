@@ -2,7 +2,17 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /** Ports for the disposable stack. Chosen to stay clear of dev servers (3000, 8545) and other local work. */
-export const PORTS = { web: 3200, chain: 8547, world: 3299 } as const;
+function port(name: string, fallback: number) {
+  const value = Number(process.env[name] ?? fallback);
+  if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error(`${name} must be a valid port`);
+  return value;
+}
+
+export const PORTS = {
+  web: port("E2E_WEB_PORT", 3200),
+  chain: port("E2E_CHAIN_PORT", 8547),
+  world: port("E2E_WORLD_PORT", 3299),
+} as const;
 export const HOST = "127.0.0.1";
 
 export const URLS = {

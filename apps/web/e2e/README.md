@@ -34,6 +34,12 @@ Restart the stack to pick up changes to the app. A reused stack keeps what earli
 
 Every setting is handed to the child processes by `e2e/stack/env.ts`. Nothing is written to a tracked file, and the values win over any `.env.local`. The World RP signing key and the door signing key are made fresh for each run. When the app learns a new setting, add it in `env.ts`. Logs for each step are in `apps/web/.e2e/logs/`. Setup order is in `e2e/stack/up.ts`. If a run is killed hard, the next one removes what it left behind.
 
+Use alternate ports when another checkout is running the default stack. Apply the same overrides to both the stack command and the test command:
+
+```sh
+E2E_WEB_PORT=3300 E2E_CHAIN_PORT=8550 E2E_WORLD_PORT=3399 pnpm --filter web e2e e2e/discovery
+```
+
 ## The stubs
 
 **World ID in the browser** (`support/world-bridge.ts`). IDKit talks to `bridge.worldcoin.org`: it posts an encrypted request, shows a link and a QR code that carry the request id and key, then polls for an answer. The stub intercepts those calls with Playwright routes and plays the phone, the way World's simulator does. It reads the key from the link on screen, decrypts the request to see which credential was asked for, and answers.
