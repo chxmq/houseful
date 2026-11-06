@@ -27,12 +27,12 @@ export function deviceSigner(): ActionSigner {
 const payWithEth = process.env.NEXT_PUBLIC_PAY_WITH_ETH !== "false";
 
 const friendly: Record<string, string> = {
-  SurrenderOnly: "Houseful tickets cannot be sold or sent on. You can only hand them back to the waitlist.",
+  SurrenderOnly: "Houseful tickets cannot be flipped above face value. Resell at face value to the waitlist instead.",
   SoldOut: "The last seat went a moment ago. You can join the waitlist instead.",
   SeatsAvailable: "Seats are still on sale, so there is no waitlist yet.",
   SaleNotOpen: "Sales for this show are not open.",
   WaitlistClosed: "The waitlist has closed for this show.",
-  SurrenderClosed: "It is too close to the show to hand a ticket back.",
+  SurrenderClosed: "It is too close to the show to resell at face value.",
   NullifierUsed: "This person already holds a ticket or waitlist place for this show.",
   WalletHasTicket: "This phone already holds a ticket for this show.",
   WalletOnWaitlist: "This phone is already on the waitlist.",

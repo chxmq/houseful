@@ -295,11 +295,11 @@ function HeldTicket({
             onClick={() => setConfirming(true)}
             className="inline-flex items-center gap-2 text-sm font-medium text-ink-soft underline decoration-ink/30 underline-offset-4"
           >
-            <ReturnIcon size={16} /> Cannot make it? Hand it back
+            <ReturnIcon size={16} /> Cannot make it? Resell at face value
           </button>
         ) : torn ? null : (
           <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="rounded-[4px] bg-paper-deep p-5">
-            <p className="font-semibold">Hand back your ticket for {event.title}?</p>
+            <p className="font-semibold">Resell at face value for {event.title}?</p>
             <p className="mt-1 text-sm text-ink-soft">
               You get {formatUsdt(event.priceUsd)} back now. If someone is waiting, the seat becomes theirs in the same
               transaction. This cannot be undone.
@@ -312,7 +312,7 @@ function HeldTicket({
                 disabled={busy}
                 className="rounded-full bg-stamp px-5 py-2.5 text-sm font-semibold text-paper disabled:opacity-60"
               >
-                {busy ? "Handing back" : `Hand back for ${formatUsdt(event.priceUsd)}`}
+                {busy ? "Reselling" : `Resell for ${formatUsdt(event.priceUsd)}`}
               </button>
               <button type="button" onClick={() => setConfirming(false)} disabled={busy} className="px-3 text-sm font-medium">
                 Keep it

@@ -38,9 +38,9 @@ const EMPTY_LOG: DoorLog = { rejected: 0, admittedAt: {}, recent: [] };
 
 const reasonCopy: Record<RejectReason, { title: string; detail: string; short: string }> = {
   stale: {
-    title: "Code expired: this looks like a screenshot",
-    detail: "Live codes change every 20 seconds. Ask to see the ticket open on their own phone.",
-    short: "Screenshot",
+    title: "Code expired",
+    detail: "Codes change every 20 seconds. After this scanner has synced, older codes stop working. Ask to see the live ticket on their phone.",
+    short: "Expired",
   },
   "already-admitted": {
     title: "Already admitted",

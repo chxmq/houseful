@@ -9,13 +9,13 @@ import { SiteHeader } from "@/components/site-header";
 export const metadata: Metadata = {
   title: "How it works",
   description:
-    "Follow one ticket from sale to door: one verified person, face value forever, hand it back to the waitlist, a door code that works offline, and refunds nobody can block.",
+    "Follow one ticket from sale to door: one verified person, face value forever, resell at face value to the waitlist, a door code that works offline, and refunds nobody can block.",
 };
 
 const contents = [
   { id: "one-person", n: "01", label: "One person" },
   { id: "face-value", n: "02", label: "Face value" },
-  { id: "hand-it-back", n: "03", label: "Hand it back" },
+  { id: "hand-it-back", n: "03", label: "Resell at face value" },
   { id: "the-door", n: "04", label: "The door" },
   { id: "cancelled", n: "05", label: "Cancelled shows" },
 ];

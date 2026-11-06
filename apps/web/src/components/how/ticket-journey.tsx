@@ -76,8 +76,8 @@ const CHAPTERS: Chapter[] = [
   {
     id: "hand-it-back",
     n: "03",
-    kicker: "Hand it back",
-    title: "Cannot go? Hand it back.",
+    kicker: "Resell at face value",
+    title: "Cannot go? Resell at face value.",
     body: [
       "You surrender the ticket to the contract and get the full price back. The first person on the waitlist, who paid into escrow when they joined, becomes the holder. It all happens in one transaction.",
       "Nobody picks who gets it and nobody earns on it. Your old door code stops working the moment the seat moves.",
@@ -102,7 +102,7 @@ const CHAPTERS: Chapter[] = [
     title: "A code that will not keep.",
     body: [
       "At the door your ticket shows a code that changes every 20 seconds. Your phone signs each one with a key that never leaves it.",
-      "The door phone checks everything itself: our signature on the ticket, your phone's signature on the code, the time, and whether the ticket is already in. No signal needed. A screenshot is stale before it can be forwarded.",
+      "The door phone checks everything itself: our signature on the ticket, your phone's signature on the code, the time, and whether the ticket is already in. No signal needed. After a scanner has synced, older codes stop working there.",
     ],
     demo: <DoorDemo />,
     ticket: {
