@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { DoorOffline } from "@/components/door/offline";
 import { ArrowRight, ScanIcon } from "@/components/icons";
 import { Wordmark } from "@/components/site-header";
 import { formatLongDate, formatTime } from "@/lib/format";
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
   title: "Door",
   description: "Scan Houseful tickets at the door. Works with no network once synced.",
   robots: { index: false },
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {
@@ -19,6 +21,7 @@ export const viewport: Viewport = {
 export default function DoorIndexPage() {
   return (
     <main className="flex min-h-dvh flex-1 flex-col bg-ink text-paper">
+      <DoorOffline />
       <header className="flex h-16 items-center gap-4 border-b border-paper/10 px-5 md:px-8">
         <Link href="/mumbai" aria-label="Houseful home">
           <Wordmark className="text-paper" />

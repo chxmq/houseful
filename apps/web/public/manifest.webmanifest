@@ -1,0 +1,9 @@
+{
+  "name": "Houseful Door",
+  "short_name": "Houseful Door",
+  "start_url": "/door",
+  "display": "standalone",
+  "background_color": "#14110f",
+  "theme_color": "#14110f",
+  "description": "Offline door scanner for Houseful tickets."
+}
