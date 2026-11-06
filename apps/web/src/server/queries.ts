@@ -39,3 +39,10 @@ export async function venue(slug: string) {
   cacheLife("minutes");
   return catalog.getVenue(slug);
 }
+
+export async function host(slug: string) {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("events");
+  return catalog.getHost(slug);
+}
