@@ -16,7 +16,7 @@ A cold run builds the app first, so it spends about 15 seconds before the first 
 
 ```sh
 pnpm --filter web e2e:stack                       # terminal 1: starts the stack and keeps it up, Ctrl+C stops it
-pnpm --filter web e2e e2e/smoke/buy.spec.ts       # terminal 2: finds the stack, skips setup, leaves it running
+pnpm --filter web e2e e2e/chain/seat-pay.spec.ts       # terminal 2: finds the stack, skips setup, leaves it running
 ```
 
 The runner follows Playwright's `reuseExistingServer` rule: it reuses a complete stack on the ports below, locally, and refuses to in CI. `E2E_REUSE=1` or `0` overrides that either way. A half-running stack (some ports busy, some not) is an error that names what answered, never a silent mix.
