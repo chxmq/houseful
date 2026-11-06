@@ -45,8 +45,9 @@ test.describe("waitlist and USDT refund", () => {
   });
 
   test.describe("with motion allowed", () => {
-    // The wallet page reports a hand-back from the end of the stub's tearing animation, which does not run when
-    // the phone asks for reduced motion (see e2e-product-bugs.md, 2). The default for these runs is reduced motion.
+    // The wallet page reports a hand-back only from the end of the stub's tearing animation (onAnimationComplete in
+    // ticket-stub.tsx), which does not run when the phone asks for reduced motion, the default for these runs.
+    // The last test in this file shows that gap with reduced motion left on.
     test.use({ reducedMotion: "no-preference" });
 
     test("when the holder hands the seat back it moves to the first in line and the holder is refunded", async ({
@@ -105,8 +106,9 @@ test.describe("waitlist and USDT refund", () => {
   });
 
   // The same hand-back with the harness's default of reduced motion. Everything has to work except the notice, which
-  // the wallet page only shows after an animation that reduced motion skips (e2e-product-bugs.md, 2). While that is
-  // open this test is marked as an expected failure, and once it is fixed the mark is not applied and the test passes.
+  // the wallet page only shows after an animation that reduced motion skips. While that is open this test is marked as
+  // an expected failure, and once it is fixed the mark is not applied and the test passes. Then the tests above and
+  // in cancel-withdraw.spec.ts no longer need to switch motion on.
   test("a hand-back is confirmed on a phone that asks for reduced motion", async ({ device, chain }) => {
     const show = await listShow((await device()).page, chain, { capacity: 1, priceUsd: 6 });
     const holder = await device();
@@ -130,7 +132,7 @@ test.describe("waitlist and USDT refund", () => {
       () => true,
       () => false,
     );
-    test.fail(!shown, "Product bug 2: the wallet page confirms a hand-back from the end of an animation that reduced motion skips.");
+    test.fail(!shown, "The wallet page confirms a hand-back from the end of an animation that reduced motion skips.");
     expect(shown, "the notice that says what the hand-back did").toBe(true);
   });
 });

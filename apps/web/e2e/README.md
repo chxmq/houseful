@@ -76,13 +76,28 @@ Both stubs together follow the whole path: the browser proves, the server checks
 - `support/catalog.ts`. The seeded shows the specs use. Update it when the seed changes.
 - `smoke/` checks the app. `harness/` checks the stubs and helpers.
 
+## Chain specs
+
+`e2e/chain/` follows a ticket through the app and checks the chain at each step: `seat-pay`, `door`, `waitlist-refund`, `cancel-withdraw` and `recover`.
+
+- Each test lists the show it needs from a host phone (`chain/host.ts`: /host/new, with the built-in wallet and the app's faucet) and buys from other phones with `device()`. Tests do not use up seed data, so they run again on a stack that is already up. `waitlist-refund` also joins and leaves a seeded sold out show, listed in `support/catalog.ts`.
+- `chain/helpers.ts` has the steps: open a show, pick a seat, pay, buy, join the line, hand back. Each waits for what the app shows when the step is done, and fails with the app's own words when the app refuses.
+- `chain/door.ts` copies the code from a ticket and pastes it into the scanner, the way door staff without a camera would.
+- `cancel-withdraw` moves the chain clock past the end of a show with `chain.atTime` and puts it back afterwards. Run it on its own: with `E2E_WORKERS` above one, another test could buy while the clock is in the future.
+- Motion is reduced in every run, and the wallet page only confirms a hand-back or a refund when motion is on. The tests that read that notice turn motion on, and one test in `waitlist-refund` is marked as an expected failure for the gap.
+
+```sh
+pnpm --filter web e2e e2e/chain          # both projects, with its own stack
+pnpm --filter web e2e e2e/chain --project=phone
+```
+
 ## Settings and output
 
 | Variable | Effect |
 |---|---|
 | `E2E_REUSE=1` or `0` | Use or refuse a stack that is already running. Default: reuse, unless `CI` is set. |
 | `E2E_WEB_PORT`, `E2E_CHAIN_PORT`, `E2E_WORLD_PORT` | Ports of the stack (3200, 8547, 3299 by default). Set the same values for the stack and for the run to keep a second stack beside one that is already running, for instance from another clone of the repo. |
-| `E2E_WORKERS=n` | Tests run one at a time by default, because they share one chain, one database and one funding account. Four workers passed four runs in a row and halve the time, but a spec that changes a shared show (a sold out show, a waitlist) must run alone. |
+| `E2E_WORKERS=n` | Tests run one at a time by default, because they share one chain, one database and one funding account. Four workers passed four runs in a row and halve the time, but a spec that changes a shared show (a sold out show, a waitlist) must run alone, and so must `cancel-withdraw`, which moves the chain clock. |
 | `E2E_HTML=1` | Also write an HTML report to `playwright-report/`. Off by default. |
 
 Failures keep a trace and a screenshot in `apps/web/test-results/`. Open a trace with `pnpm --filter web exec playwright show-trace <trace.zip>`. Motion is reduced, the clock zone is UTC and the locale is en-IN in every run, so a run looks the same on any machine. A spec about a city's own time zone sets its own with `test.use({ timezoneId })`.

@@ -12,8 +12,8 @@ import { cancelHostedShow, listShow, withdrawHostedProceeds } from "./host";
 
 test.describe("cancel and withdraw", () => {
   test.describe("with motion allowed", () => {
-    // The wallet page confirms a refund from the end of the stub's tearing animation, which does not run when the phone
-    // asks for reduced motion (e2e-product-bugs.md, 2). The default for these runs is reduced motion.
+    // The wallet page confirms a refund only from the end of the stub's tearing animation, which does not run when the
+    // phone asks for reduced motion, the default for these runs. waitlist-refund.spec.ts keeps that gap in view.
     test.use({ reducedMotion: "no-preference" });
 
     test("the host cancels and the fan claims the refund in USDT", async ({ page, device, chain }) => {
