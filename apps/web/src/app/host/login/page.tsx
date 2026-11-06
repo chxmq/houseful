@@ -1,0 +1,51 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { WorldLogin } from "@/components/auth/world-login";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
+import { getSession } from "@/server/auth/session";
+
+export const metadata: Metadata = {
+  title: "Host sign in",
+  description: "Sign in with World ID to list shows and withdraw proceeds.",
+  robots: { index: false },
+};
+
+const reasons: Record<string, string> = {
+  signin: "Sign in with World ID to open the host console.",
+  "fan-account": "That account is for fans. Sign in here as a host.",
+};
+
+export default async function HostLoginPage({ searchParams }: PageProps<"/host/login">) {
+  const params = await searchParams;
+  const next = typeof params.next === "string" ? params.next : "/host";
+  const reason = typeof params.reason === "string" ? params.reason : undefined;
+  const session = await getSession();
+  if (session?.account.kind === "host") redirect(next);
+  if (session?.account.kind === "fan") redirect("/account");
+
+  return (
+    <>
+      <SiteHeader />
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-5 py-16 md:px-8">
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">Host</p>
+        <h1 className="mt-3 font-display text-5xl font-black uppercase leading-none">Host sign in</h1>
+        <p className="mt-4 max-w-prose text-ink-soft">
+          Same World ID idea, separate host account. Fans cannot open this console.
+        </p>
+        {reason && reasons[reason] ? <p className="mt-4 text-sm font-medium">{reasons[reason]}</p> : null}
+        <div className="mt-8">
+          <WorldLogin kind="host" next={next} label="Sign in as host" />
+        </div>
+        <p className="mt-8 text-sm text-ink-soft">
+          Buying tickets?{" "}
+          <Link href="/login" className="font-semibold underline underline-offset-4">
+            Fan sign in
+          </Link>
+        </p>
+      </main>
+      <SiteFooter />
+    </>
+  );
+}

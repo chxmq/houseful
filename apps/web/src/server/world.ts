@@ -88,15 +88,15 @@ type VerifySuccessBody = {
 };
 
 /**
- * Checks a proof with World's verify API and binds it to the wallet that will pay.
- * The wallet is the IDKit signal, so a proof shown for one wallet cannot be replayed for another.
+ * Checks a proof with World's verify API and binds it to an IDKit signal.
+ * Ticket buys pass the paying wallet as the signal. Account login passes a login challenge.
  *
  * World's 200 means "at least one proof verified", with per-item results. We require exactly one
  * response and take the nullifier only from a successful entry in the verify response.
  */
 export async function verifyWorldProof(
   result: IDKitResult,
-  expected: { action: string; wallet: `0x${string}`; assurance: Assurance },
+  expected: { action: string; signal: string; assurance: Assurance },
 ): Promise<VerifiedHuman> {
   const env = serverEnv();
 
@@ -116,7 +116,7 @@ export async function verifyWorldProof(
   if (!Array.isArray(result.responses) || result.responses.length !== 1) {
     throw new WorldVerificationError(
       "wrong-shape",
-      "Houseful accepts exactly one World ID proof per purchase.",
+      "Houseful accepts exactly one World ID proof per request.",
     );
   }
 
@@ -125,9 +125,9 @@ export async function verifyWorldProof(
     throw new WorldVerificationError("wrong-shape", "The proof is missing a uniqueness nullifier.");
   }
 
-  const signalHash = hashSignal(expected.wallet.toLowerCase()).toLowerCase();
+  const signalHash = hashSignal(expected.signal).toLowerCase();
   if (item.signal_hash?.toLowerCase() !== signalHash) {
-    throw new WorldVerificationError("signal-mismatch", "This proof is bound to a different wallet.");
+    throw new WorldVerificationError("signal-mismatch", "This proof is bound to a different signal.");
   }
 
   let response: Response;

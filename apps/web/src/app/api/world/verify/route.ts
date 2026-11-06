@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
   let human;
   try {
-    human = await verifyWorldProof(result, { action, wallet, assurance });
+    human = await verifyWorldProof(result, { action, signal: wallet.toLowerCase(), assurance });
   } catch (err) {
     if (err instanceof WorldVerificationError) {
       const status = err.code === "world-unreachable" ? 503 : err.code === "weak-credential" ? 403 : 422;

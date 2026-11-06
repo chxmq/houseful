@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountSlot } from "./auth/account-slot";
 import { TicketIcon } from "./icons";
 
 type SiteHeaderProps = {
@@ -60,6 +61,7 @@ export function SiteHeader({ city }: SiteHeaderProps) {
             <TicketIcon size={16} />
             <span className="sr-only sm:not-sr-only">Your tickets</span>
           </Link>
+          <AccountSlot />
         </nav>
       </div>
     </header>

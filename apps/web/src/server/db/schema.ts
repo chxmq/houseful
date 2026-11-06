@@ -38,7 +38,7 @@ export type VenueKind = (typeof VENUE_KINDS)[number];
 export const CREDENTIALS = ["orb", "document", "selfie", "device"] as const;
 export type Credential = (typeof CREDENTIALS)[number];
 
-export const VERIFICATION_PURPOSES = ["buy", "join", "claim"] as const;
+export const VERIFICATION_PURPOSES = ["buy", "join", "claim", "login"] as const;
 export type VerificationPurpose = (typeof VERIFICATION_PURPOSES)[number];
 
 const createdAt = () =>
@@ -170,6 +170,61 @@ export const attendance = sqliteTable(
   (t) => [primaryKey({ name: "attendance_event_nullifier_pk", columns: [t.eventId, t.nullifier] })],
 );
 
+export const ACCOUNT_KINDS = ["fan", "host"] as const;
+export type AccountKind = (typeof ACCOUNT_KINDS)[number];
+
+export const WALLET_KINDS = ["device", "external"] as const;
+export type WalletKind = (typeof WALLET_KINDS)[number];
+
+/** Signed-in person. Identity is a World ID nullifier, not an email or password. */
+export const accounts = sqliteTable(
+  "accounts",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind", { enum: ACCOUNT_KINDS }).notNull(),
+    nullifier: text("nullifier").notNull(),
+    credential: text("credential", { enum: CREDENTIALS }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("accounts_kind_nullifier_unique").on(t.kind, t.nullifier),
+    index("accounts_nullifier_idx").on(t.nullifier),
+  ],
+);
+
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    tokenHash: text("token_hash").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    expiresAt: integer("expires_at").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("sessions_account_idx").on(t.accountId), index("sessions_expires_idx").on(t.expiresAt)],
+);
+
+/** Wallets linked to an account. One may be active for paying. */
+export const wallets = sqliteTable(
+  "wallets",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    address: text("address").notNull(),
+    kind: text("kind", { enum: WALLET_KINDS }).notNull(),
+    label: text("label"),
+    active: integer("active", { mode: "boolean" }).notNull().default(false),
+    linkedAt: integer("linked_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("wallets_account_address_unique").on(t.accountId, t.address),
+    index("wallets_account_idx").on(t.accountId),
+  ],
+);
+
 export type City = typeof cities.$inferSelect;
 export type NewCity = typeof cities.$inferInsert;
 export type Venue = typeof venues.$inferSelect;
@@ -184,3 +239,7 @@ export type Verification = typeof verifications.$inferSelect;
 export type NewVerification = typeof verifications.$inferInsert;
 export type Attendance = typeof attendance.$inferSelect;
 export type NewAttendance = typeof attendance.$inferInsert;
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+export type SessionRow = typeof sessions.$inferSelect;
+export type WalletRow = typeof wallets.$inferSelect;

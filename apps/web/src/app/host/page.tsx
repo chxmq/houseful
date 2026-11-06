@@ -3,6 +3,7 @@ import { HostConsole, type CatalogShow } from "@/components/host/host-console";
 import { RiseText } from "@/components/motion/reveal";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { requireHost } from "@/server/auth/session";
 import { cityEvents } from "@/server/queries";
 
 export const metadata: Metadata = { title: "Host a show" };
@@ -27,6 +28,7 @@ const promises = [
 ];
 
 export default async function HostPage() {
+  await requireHost("/host");
   const events = await cityEvents("mumbai");
   const catalog: CatalogShow[] = events
     .filter((e) => e.chainEventId != null)

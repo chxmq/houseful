@@ -35,3 +35,8 @@ export const assuranceCopy: Record<Assurance, { label: string; why: string }> = 
 export function worldActionFor(eventId: string) {
   return `ticket:${eventId}`;
 }
+
+/** World ID action that proves a person for fan or host login. */
+export function accountActionFor(kind: "fan" | "host") {
+  return `account:${kind}`;
+}
