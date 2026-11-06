@@ -86,7 +86,7 @@ export function DoorCode(props: DoorCodeProps) {
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="relative size-[min(132px,30vw)] rounded-[6px] bg-paper p-2">
+      <div className="relative size-[min(80vw,340px)] rounded-[6px] bg-paper p-[min(5vw,22px)] sm:size-[min(132px,30vw)] sm:p-2">
         <AnimatePresence mode="popLayout" initial={false}>
           {svg ? (
             <motion.div
