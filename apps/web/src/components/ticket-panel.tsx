@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { Assurance } from "@/lib/assurance";
 import { assuranceCopy } from "@/lib/assurance";
 import { explorerTx } from "@/lib/chain";
-import { formatEth, formatInr, formatLongDate } from "@/lib/format";
+import { formatEth, formatUsdt, formatLongDate } from "@/lib/format";
 import {
   buyTicket,
   claimReturnedSeat,
@@ -25,8 +25,8 @@ export type TicketPanelEvent = {
   id: string;
   title: string;
   chainEventId: number | null;
-  priceInr: number;
-  faceValueWei: string;
+  priceUsd: number;
+  faceValueUnits: string;
   capacity: number;
   sold: number;
   status: string;
@@ -56,7 +56,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   if (event.chainEventId == null) {
     return (
       <div className="mt-8 rounded-[4px] bg-paper-deep p-6">
-        <p className="font-display text-3xl font-extrabold uppercase">{formatInr(event.priceInr)}</p>
+        <p className="font-display text-3xl font-extrabold uppercase">{formatUsdt(event.priceUsd)}</p>
         <p className="mt-2 max-w-[48ch] text-ink-soft">
           Houseful is selling tickets in Mumbai first. This show is listed so you can plan, and booking opens here when
           the host moves their sale over.
@@ -69,12 +69,12 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
     return (
       <div className="mt-8 rounded-[4px] bg-paper-deep p-6">
         <p className="font-display text-3xl font-extrabold uppercase">On sale soon</p>
-        <p className="mt-2 text-ink-soft">The price is set at {formatInr(event.priceInr)} and will not change.</p>
+        <p className="mt-2 text-ink-soft">The price is set at {formatUsdt(event.priceUsd)} and will not change.</p>
       </div>
     );
   }
 
-  const faceValue = BigInt(event.faceValueWei);
+  const faceValue = BigInt(event.faceValueUnits);
   const mode = !state ? null : state.available > 0 ? (state.returned > 0 && state.available === state.returned ? "claim" : "buy") : "join";
   const credential = assuranceCopy[event.assurance];
 
@@ -104,7 +104,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
     <div className="mt-8">
       <div className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p className="font-display text-[56px] font-black leading-none">{formatInr(event.priceInr)}</p>
+          <p className="font-display text-[56px] font-black leading-none">{formatUsdt(event.priceUsd)}</p>
           <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
             Paid as {formatEth(faceValue)} on testnet · same price for everyone
           </p>
@@ -168,7 +168,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                   />
                   <p className="mt-3 text-sm text-muted">
                     {mode === "join"
-                      ? `You lock ${formatInr(event.priceInr)} now. If a seat comes back, it is yours automatically. Leave any time for a full refund.`
+                      ? `You lock ${formatUsdt(event.priceUsd)} now. If a seat comes back, it is yours automatically. Leave any time for a full refund.`
                       : `World ID ${credential.label} keeps it to one ticket per person. We never see who you are.`}
                   </p>
                 </>
@@ -201,7 +201,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                   title={event.title}
                   lines={[
                     { label: "Venue", value: event.venue },
-                    { label: "Paid", value: formatInr(event.priceInr) },
+                    { label: "Paid", value: formatUsdt(event.priceUsd) },
                     { label: "Holder", value: "Verified person" },
                     { label: "Ticket", value: `No. ${String(phase.ticketId + 1).padStart(4, "0")}` },
                   ]}

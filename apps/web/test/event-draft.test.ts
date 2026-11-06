@@ -10,7 +10,7 @@ import {
   slugify,
   type EventDraft,
 } from "../src/lib/event-draft";
-import { inrToWei } from "../src/lib/pricing";
+import { usdToUnits } from "../src/lib/pricing";
 
 const F: EventDraft = {
   slug: "the-last-local-abcd",
@@ -22,8 +22,9 @@ const F: EventDraft = {
   startsAt: 1795271400,
   doorsBeforeMins: 60,
   durationMins: 150,
-  priceInr: 999,
+  priceUsd: 999,
   capacity: 300,
+  seated: false,
   surrenderCutoffHours: 24,
   ageLimit: 18,
   language: "Hindi, English",
@@ -33,7 +34,7 @@ const F: EventDraft = {
   posterInk: "stamp",
 };
 
-const F_HASH = "0x009705ca716958a146f142a7e85f03e904d4da2fc90ec1d41a6098e5d4b9b79f";
+const F_HASH = "0x7d8f450026919267b1d41b63c158b4fce9a0993f1caeba6757a6703f8391244a";
 
 const F_SORTED_JSON = [
   '{"ageLimit":18',
@@ -47,7 +48,8 @@ const F_SORTED_JSON = [
   '"lineup":["Asha","Ravi"]',
   '"posterInk":"stamp"',
   '"posterVariant":2',
-  '"priceInr":999',
+  '"priceUsd":999',
+  '"seated":false',
   '"slug":"the-last-local-abcd"',
   '"startsAt":1795271400',
   '"subtitle":"One night only"',
@@ -68,8 +70,9 @@ const CHANGED: EventDraft = {
   startsAt: 1795271401,
   doorsBeforeMins: 61,
   durationMins: 151,
-  priceInr: 1000,
+  priceUsd: 1000,
   capacity: 301,
+  seated: true,
   surrenderCutoffHours: 25,
   ageLimit: 17,
   language: "Hindi",
@@ -111,9 +114,9 @@ const REJECTED: SchemaCase[] = [
   ["doorsBeforeMins", "241", 241],
   ["durationMins", "14", 14],
   ["durationMins", "1441", 1441],
-  ["priceInr", "-1", -1],
-  ["priceInr", "100001", 100_001],
-  ["priceInr", "1.5", 1.5],
+  ["priceUsd", "-1", -1],
+  ["priceUsd", "100001", 100_001],
+  ["priceUsd", "1.5", 1.5],
   ["capacity", "0", 0],
   ["capacity", "100001", 100_001],
   ["surrenderCutoffHours", "-1", -1],
@@ -151,8 +154,8 @@ const ACCEPTED: SchemaCase[] = [
   ["doorsBeforeMins", "240", 240],
   ["durationMins", "15", 15],
   ["durationMins", "1440", 1440],
-  ["priceInr", "0", 0],
-  ["priceInr", "100000", 100_000],
+  ["priceUsd", "0", 0],
+  ["priceUsd", "100000", 100_000],
   ["capacity", "1", 1],
   ["capacity", "100000", 100_000],
   ["surrenderCutoffHours", "0", 0],
@@ -212,7 +215,7 @@ describe("draftHash", () => {
 
   it("gives every single-key change its own hash", () => {
     const hashes = SCHEMA_KEYS.map((key) => draftHash({ ...F, [key]: CHANGED[key] }));
-    expect(new Set([F_HASH, ...hashes]).size).toBe(19);
+    expect(new Set([F_HASH, ...hashes]).size).toBe(SCHEMA_KEYS.length + 1);
   });
 
   it.each(PADDED)("gives a padded %s the same hash once parsed", (key, padded) => {
@@ -242,8 +245,9 @@ describe("draftSchedule", () => {
 describe("chainParams", () => {
   it("builds the exact createEvent arguments for fixture F", () => {
     expect(chainParams(F, 1795000000)).toEqual({
-      faceValue: 3330000000000000n,
+      faceValue: 999000000n,
       capacity: 300n,
+      seated: false,
       saleStart: 1795000000n,
       surrenderCutoff: 1795181400n,
       endsAt: 1795280400n,
@@ -253,26 +257,26 @@ describe("chainParams", () => {
   });
 
   it("gives a free show a zero face value", () => {
-    expect(chainParams({ ...F, priceInr: 0 }, 1795000000).faceValue).toBe(0n);
+    expect(chainParams({ ...F, priceUsd: 0 }, 1795000000).faceValue).toBe(0n);
   });
 
   it("refuses a price that is not a whole rupee amount", () => {
-    expect(() => chainParams({ ...F, priceInr: 1.5 }, 1795000000)).toThrow("Invalid INR price");
+    expect(() => chainParams({ ...F, priceUsd: 1.5 }, 1795000000)).toThrow("Invalid USDT price");
   });
 });
 
-describe("inrToWei", () => {
+describe("usdToUnits", () => {
   it.each([
     [0, "0"],
-    [1, "3333333333333"],
-    [999, "3330000000000000"],
-    [100000, "333333333333333333"],
-  ])("floors ₹%s to %s wei", (rupees, wei) => {
-    expect(inrToWei(rupees)).toBe(wei);
+    [1, "1000000"],
+    [999, "999000000"],
+    [100000, "100000000000"],
+  ])("turns $%s into %s units", (dollars, units) => {
+    expect(usdToUnits(dollars)).toBe(units);
   });
 
-  it.each([[-1], [1.5], [Number.NaN]])("throws on %s", (rupees) => {
-    expect(() => inrToWei(rupees)).toThrow("Invalid INR price");
+  it.each([[-1], [1.5], [Number.NaN]])("throws on %s", (dollars) => {
+    expect(() => usdToUnits(dollars)).toThrow("Invalid USDT price");
   });
 });
 

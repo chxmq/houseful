@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { contractAddress, housefulAbi } from "@/lib/contract";
 import { deviceWallet, publicClient } from "@/lib/device-wallet";
 import { deviceDoorKey, doorKeyBytes32 } from "@/lib/door-key";
-import { formatInr, formatLongDate, formatTime, shortHex } from "@/lib/format";
+import { formatUsdt, formatLongDate, formatTime, shortHex } from "@/lib/format";
 import { bindDoorKey, claimRefund, explainError, leaveWaitlist, surrenderTicket } from "@/lib/ticket-actions";
 import { DoorCode } from "./door-code";
 import { ArrowRight, ReturnIcon } from "./icons";
@@ -19,7 +19,7 @@ export type WalletEvent = {
   title: string;
   startsAt: number;
   doorsAt: number;
-  priceInr: number;
+  priceUsd: number;
   venue: string;
 };
 
@@ -183,8 +183,8 @@ function HeldTicket({
       const res = await surrenderTicket(event.chainEventId, ticketId);
       setResult(
         res.to === "0x0000000000000000000000000000000000000000"
-          ? `Refunded ${formatInr(event.priceInr)}. Nobody was waiting, so the seat is back on sale.`
-          : `Refunded ${formatInr(event.priceInr)}. Your seat went to ${shortHex(res.to)}, next in line, in the same transaction.`,
+          ? `Refunded ${formatUsdt(event.priceUsd)}. Nobody was waiting, so the seat is back on sale.`
+          : `Refunded ${formatUsdt(event.priceUsd)}. Your seat went to ${shortHex(res.to)}, next in line, in the same transaction.`,
       );
       setTorn(true);
     } catch (err) {
@@ -198,7 +198,7 @@ function HeldTicket({
     setError(null);
     try {
       await claimRefund(event.chainEventId);
-      setResult(`${event.title} was cancelled. ${formatInr(event.priceInr)} is back in this phone's wallet.`);
+      setResult(`${event.title} was cancelled. ${formatUsdt(event.priceUsd)} is back in this phone's wallet.`);
       setTorn(true);
     } catch (err) {
       setError(explainError(err));
@@ -229,7 +229,7 @@ function HeldTicket({
         lines={[
           { label: "Venue", value: event.venue },
           { label: "Doors", value: formatTime(event.doorsAt) },
-          { label: "Paid", value: formatInr(event.priceInr) },
+          { label: "Paid", value: formatUsdt(event.priceUsd) },
           { label: "Holder", value: "Verified person, this phone" },
         ]}
         serial={`HSF-${event.chainEventId}-${ticketId} · GEN ${holding.generation}`}
@@ -243,7 +243,7 @@ function HeldTicket({
                 disabled={busy || torn}
                 className="rounded-full bg-marigold px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
               >
-                {busy ? "Refunding" : `Claim ${formatInr(event.priceInr)}`}
+                {busy ? "Refunding" : `Claim ${formatUsdt(event.priceUsd)}`}
               </button>
               {error ? <p className="text-xs text-paper/70">{error}</p> : null}
             </div>
@@ -282,7 +282,7 @@ function HeldTicket({
           <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="rounded-[4px] bg-paper-deep p-5">
             <p className="font-semibold">Hand back your ticket for {event.title}?</p>
             <p className="mt-1 text-sm text-ink-soft">
-              You get {formatInr(event.priceInr)} back now. If someone is waiting, the seat becomes theirs in the same
+              You get {formatUsdt(event.priceUsd)} back now. If someone is waiting, the seat becomes theirs in the same
               transaction. This cannot be undone.
             </p>
             {error ? <p className="mt-3 text-sm font-medium text-reject">{error}</p> : null}
@@ -293,7 +293,7 @@ function HeldTicket({
                 disabled={busy}
                 className="rounded-full bg-stamp px-5 py-2.5 text-sm font-semibold text-paper disabled:opacity-60"
               >
-                {busy ? "Handing back" : `Hand back for ${formatInr(event.priceInr)}`}
+                {busy ? "Handing back" : `Hand back for ${formatUsdt(event.priceUsd)}`}
               </button>
               <button type="button" onClick={() => setConfirming(false)} disabled={busy} className="px-3 text-sm font-medium">
                 Keep it
@@ -322,7 +322,7 @@ function WaitingSpot({
     try {
       if (holding.cancelled) await claimRefund(event.chainEventId);
       else await leaveWaitlist(event.chainEventId, position);
-      onChanged(`You left the waitlist for ${event.title}. ${formatInr(event.priceInr)} is back in your wallet.`);
+      onChanged(`You left the waitlist for ${event.title}. ${formatUsdt(event.priceUsd)} is back in your wallet.`);
     } catch (err) {
       setError(explainError(err));
       setBusy(false);
@@ -342,7 +342,7 @@ function WaitingSpot({
         </div>
       </div>
       <p className="mt-4 text-sm text-ink-soft">
-        {formatInr(event.priceInr)} is held by the contract. The moment someone ahead of you gets a seat and the next
+        {formatUsdt(event.priceUsd)} is held by the contract. The moment someone ahead of you gets a seat and the next
         one comes back, it is yours with no action needed.
       </p>
       {error ? <p className="mt-3 text-sm font-medium text-reject">{error}</p> : null}
@@ -351,7 +351,7 @@ function WaitingSpot({
           See the public line
         </Link>
         <button type="button" onClick={leave} disabled={busy} className="text-ink-soft underline underline-offset-4">
-          {busy ? "Leaving" : holding.cancelled ? `Show cancelled. Claim ${formatInr(event.priceInr)}` : "Leave and get a refund"}
+          {busy ? "Leaving" : holding.cancelled ? `Show cancelled. Claim ${formatUsdt(event.priceUsd)}` : "Leave and get a refund"}
         </button>
       </div>
     </li>

@@ -50,6 +50,7 @@ export const cities = sqliteTable("cities", {
   slug: text("slug").primaryKey(),
   name: text("name").notNull(),
   state: text("state").notNull(),
+  country: text("country").notNull().default("India"),
   timezone: text("timezone").notNull().default("Asia/Kolkata"),
 });
 
@@ -105,8 +106,9 @@ export const events = sqliteTable(
     startsAt: integer("starts_at").notNull(),
     doorsAt: integer("doors_at").notNull(),
     endsAt: integer("ends_at").notNull(),
-    priceInr: integer("price_inr").notNull(),
-    faceValueWei: text("face_value_wei").notNull(),
+    priceUsd: integer("price_usd").notNull(),
+    faceValueUnits: text("face_value_units").notNull(),
+    seated: integer("seated", { mode: "boolean" }).notNull().default(false),
     capacity: integer("capacity").notNull(),
     sold: integer("sold").notNull().default(0),
     status: text("status", { enum: EVENT_STATUSES }).notNull(),
@@ -120,6 +122,8 @@ export const events = sqliteTable(
     posterVariant: integer("poster_variant").notNull(),
     posterInk: text("poster_ink", { enum: POSTER_INKS }).notNull(),
     surrenderCutoffHours: integer("surrender_cutoff_hours").notNull(),
+    officialUrl: text("official_url").notNull().default(""),
+    sourceUrl: text("source_url").notNull().default(""),
     createdAt: createdAt(),
   },
   (t) => [

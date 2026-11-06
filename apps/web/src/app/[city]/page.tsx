@@ -8,7 +8,7 @@ import { Deal, RiseText } from "@/components/motion/reveal";
 import { Stamp } from "@/components/motion/stamp";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { categoryLabel, formatDayMonth, formatInr, formatWeekday } from "@/lib/format";
+import { categoryLabel, formatDayMonth, formatUsdt, formatWeekday } from "@/lib/format";
 import { cities, city as getCity, cityEvents, featured } from "@/server/queries";
 
 export async function generateStaticParams() {
@@ -110,7 +110,7 @@ async function CityContent({ params }: Pick<PageProps<"/[city]">, "params">) {
                     </div>
                     <div className="mt-3 flex items-baseline justify-between gap-4">
                       <p className="truncate text-sm font-semibold">{e.title}</p>
-                      <p className="shrink-0 font-mono text-xs">{formatInr(e.priceInr)}</p>
+                      <p className="shrink-0 font-mono text-xs">{formatUsdt(e.priceUsd)}</p>
                     </div>
                     <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
                       {formatWeekday(e.startsAt)} {formatDayMonth(e.startsAt)} · {e.venue.area}

@@ -63,8 +63,8 @@ export type EventSummary = {
   startsAt: number;
   doorsAt: number;
   endsAt: number;
-  priceInr: number;
-  faceValueWei: string;
+  priceUsd: number;
+  faceValueUnits: string;
   capacity: number;
   sold: number;
   remaining: number;
@@ -182,6 +182,7 @@ export async function listCities(opts: TimeOptions = {}): Promise<CitySummary[]>
       slug: cities.slug,
       name: cities.name,
       state: cities.state,
+      country: cities.country,
       timezone: cities.timezone,
       upcomingCount: sql<number>`count(${events.id})`,
     })

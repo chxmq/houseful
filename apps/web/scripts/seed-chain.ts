@@ -100,7 +100,7 @@ async function main() {
     const id = BigInt(e.chainEventId!);
     const soldOut = e.status === "sold_out";
     const capacity = BigInt(soldOut ? SOLD_OUT_ALLOCATION : Math.max(1, e.capacity - e.sold));
-    const faceValue = BigInt(e.faceValueWei);
+    const faceValue = BigInt(e.faceValueUnits);
     const holdersWanted = soldOut ? Number(capacity) - (e.id === FLAGSHIP ? 1 : 0) : 0;
 
     if (id > existing) {
@@ -152,7 +152,7 @@ async function main() {
     }
     if (info.waitlistLength > 0n) continue;
 
-    const faceValue = BigInt(e.faceValueWei);
+    const faceValue = BigInt(e.faceValueUnits);
     const fans = [];
     for (let i = 0; i < WAITERS; i++) fans.push(await seedFan(id, faceValue, "joinWaitlist"));
     await wait(

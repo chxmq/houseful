@@ -1,6 +1,6 @@
 import { keccak256, toBytes, type Hex } from "viem";
 import { z } from "zod";
-import { inrToWei } from "./pricing";
+import { usdToUnits } from "./pricing";
 
 export const CATEGORIES = ["music", "comedy", "theatre", "sports", "food", "workshops", "nightlife"] as const;
 export const INKS = ["stamp", "marigold", "ink", "admit"] as const;
@@ -16,8 +16,9 @@ export const draftSchema = z
     startsAt: z.number().int(),
     doorsBeforeMins: z.number().int().min(0).max(240),
     durationMins: z.number().int().min(15).max(24 * 60),
-    priceInr: z.number().int().min(0).max(1_00_000),
+    priceUsd: z.number().int().min(0).max(1_00_000),
     capacity: z.number().int().min(1).max(1_00_000),
+    seated: z.boolean(),
     surrenderCutoffHours: z.number().int().min(0).max(14 * 24),
     ageLimit: z.number().int().min(0).max(21),
     language: z.string().trim().min(2).max(40),
@@ -64,8 +65,9 @@ export function draftSchedule(draft: EventDraft) {
 export function chainParams(draft: EventDraft, saleStart: number) {
   const { endsAt, surrenderCutoff } = draftSchedule(draft);
   return {
-    faceValue: BigInt(inrToWei(draft.priceInr)),
+    faceValue: BigInt(usdToUnits(draft.priceUsd)),
     capacity: BigInt(draft.capacity),
+    seated: draft.seated,
     saleStart: BigInt(saleStart),
     surrenderCutoff: BigInt(surrenderCutoff),
     endsAt: BigInt(endsAt),

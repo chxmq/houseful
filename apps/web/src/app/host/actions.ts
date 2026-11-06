@@ -5,7 +5,7 @@ import { updateTag } from "next/cache";
 import { parseEventLogs, type Hex } from "viem";
 import { contractAddress, housefulAbi } from "@/lib/contract";
 import { chainParams, draftSchedule, draftSchema, slugify } from "@/lib/event-draft";
-import { inrToWei } from "@/lib/pricing";
+import { usdToUnits } from "@/lib/pricing";
 import { serverChain } from "@/server/chain";
 import { db } from "@/server/db/client";
 import { events, hosts, venues } from "@/server/db/schema";
@@ -74,10 +74,13 @@ export async function listShow(input: unknown, txHash: Hex): Promise<ListShowRes
       startsAt: draft.startsAt,
       doorsAt,
       endsAt,
-      priceInr: draft.priceInr,
-      faceValueWei: inrToWei(draft.priceInr),
+      priceUsd: draft.priceUsd,
+      faceValueUnits: usdToUnits(draft.priceUsd),
+      seated: draft.seated,
       capacity: draft.capacity,
       sold: 0,
+      officialUrl: "",
+      sourceUrl: "",
       status: "on_sale",
       featured: false,
       ageLimit: draft.ageLimit,

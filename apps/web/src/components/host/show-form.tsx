@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { listShow } from "@/app/host/actions";
 import { CATEGORIES, chainParams, draftSchema, INKS, slugify, type EventDraft } from "@/lib/event-draft";
-import { categoryLabel, formatEth, formatInr, formatLongDate, formatTime } from "@/lib/format";
+import { categoryLabel, formatUsdt, formatLongDate, formatTime } from "@/lib/format";
 import { createShow } from "@/lib/host-actions";
 import { explainError } from "@/lib/ticket-actions";
 import { EventPoster } from "../event-poster";
@@ -43,8 +43,9 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
     ...istParts(nextSaturdayEvening(now)),
     doorsBeforeMins: 60,
     durationMins: 150,
-    priceInr: 999,
+    priceUsd: 12,
     capacity: 300,
+    seated: false,
     surrenderCutoffHours: 24,
     ageLimit: 18,
     language: "Hindi, English",
@@ -193,7 +194,7 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
           </p>
           <div className="grid gap-5 sm:grid-cols-3">
             <Field label="Face value, ₹">
-              <NumberInput value={form.priceInr} onChange={set("priceInr")} min={0} max={100000} />
+              <NumberInput value={form.priceUsd} onChange={set("priceUsd")} min={0} max={100000} />
             </Field>
             <Field label="Seats" hint={venue ? `${venue.name} holds ${venue.capacity.toLocaleString("en-IN")}` : undefined}>
               <NumberInput value={form.capacity} onChange={set("capacity")} min={1} max={100000} />
@@ -283,7 +284,7 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
           <p className="mb-3 text-[10px] uppercase tracking-[0.18em] text-paper/50">What your wallet signs</p>
           <p>houseful.createEvent({"{"}</p>
           <div className="pl-4">
-            <Term name="faceValue" value={terms ? formatEth(terms.faceValue) : "…"} note={formatInr(form.priceInr)} />
+            <Term name="faceValue" value={terms ? `${terms.faceValue} units` : "…"} note={formatUsdt(form.priceUsd)} />
             <Term name="capacity" value={terms ? String(terms.capacity) : "…"} note="one per verified person" />
             <Term
               name="surrenderCutoff"

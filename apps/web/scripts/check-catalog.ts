@@ -38,7 +38,7 @@ async function main() {
   const flagship = await catalog.getEvent("the-last-local-nsci-dome");
   assert(flagship?.status === "sold_out" && flagship.chainEventId === 1, "flagship");
   assert(flagship.venue.address && flagship.host.about && flagship.city.state, "detail joins");
-  console.log("flagship", flagship.title, flagship.faceValueWei, flagship.highlights.length, "highlights");
+  console.log("flagship", flagship.title, flagship.faceValueUnits, flagship.highlights.length, "highlights");
 
   const featured = await catalog.featuredEvents("mumbai", { now });
   console.log("featured", featured.map((e) => e.slug));

@@ -1,10 +1,9 @@
-// Fixed demo rate. The contracts seed must use the same formula so on-chain face values match the catalog.
-export const DEMO_INR_PER_ETH = 300_000;
+/** USDT has 6 decimals. Whole dollars become base units. */
+export const USDT_DECIMALS = 6;
+const UNITS_PER_USDT = 10n ** BigInt(USDT_DECIMALS);
 
-const WEI_PER_ETH = BigInt("1000000000000000000");
-
-/** Face value in wei as a decimal string: floor(priceInr * 1e18 / 300000). */
-export function inrToWei(priceInr: number): string {
-  if (!Number.isInteger(priceInr) || priceInr < 0) throw new Error(`Invalid INR price: ${priceInr}`);
-  return ((BigInt(priceInr) * WEI_PER_ETH) / BigInt(DEMO_INR_PER_ETH)).toString();
+/** Face value in USDT base units as a decimal string: priceUsd * 1e6. */
+export function usdToUnits(priceUsd: number): string {
+  if (!Number.isInteger(priceUsd) || priceUsd < 0) throw new Error(`Invalid USDT price: ${priceUsd}`);
+  return (BigInt(priceUsd) * UNITS_PER_USDT).toString();
 }

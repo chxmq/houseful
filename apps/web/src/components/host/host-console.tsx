@@ -4,13 +4,13 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { deviceWallet } from "@/lib/device-wallet";
-import { formatEth, formatInr, formatLongDate, shortHex } from "@/lib/format";
+import { formatEth, formatUsdt, formatLongDate, shortHex } from "@/lib/format";
 import { cancelShow, hostedShows, withdrawProceeds, type HostedShow } from "@/lib/host-actions";
 import { explainError } from "@/lib/ticket-actions";
 import { PlusIcon } from "../icons";
 import { SplitFlap } from "../motion/split-flap";
 
-export type CatalogShow = { chainEventId: number; slug: string; title: string; startsAt: number; priceInr: number };
+export type CatalogShow = { chainEventId: number; slug: string; title: string; startsAt: number; priceUsd: number };
 
 export function HostConsole({ catalog }: { catalog: CatalogShow[] }) {
   const [wallet, setWallet] = useState<`0x${string}` | null>(null);
@@ -125,7 +125,7 @@ function HostedRow({
           <Stat label="Waiting" value={String(show.waitlistActive)} />
           <Stat
             label={ended ? "Proceeds" : "Proceeds at the end"}
-            value={meta ? formatInr(meta.priceInr * held) : formatEth(proceeds)}
+            value={meta ? formatUsdt(meta.priceUsd * held) : formatEth(proceeds)}
           />
         </dl>
         {error ? <p className="mt-3 text-sm font-medium text-reject">{error}</p> : null}

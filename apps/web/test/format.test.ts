@@ -5,7 +5,7 @@ import {
   formatDayMonth,
   formatDayNum,
   formatEth,
-  formatInr,
+  formatUsdt,
   formatLongDate,
   formatMonShort,
   formatTime,
@@ -26,17 +26,17 @@ const LABELS: Record<(typeof CATEGORIES)[number], string> = {
   nightlife: "Nightlife",
 };
 
-describe("formatInr", () => {
+describe("formatUsdt", () => {
   it.each([
-    [0, "₹0"],
-    [1000, "₹1,000"],
-    [100000, "₹1,00,000"],
-    [1234567, "₹12,34,567"],
-    [10000000, "₹1,00,00,000"],
-    [1499.5, "₹1,500"],
-    [-500, "-₹500"],
-  ])("formats %s as %s", (rupees, text) => {
-    expect(formatInr(rupees)).toBe(text);
+    [0, "$0"],
+    [12, "$12"],
+    [1000, "$1,000"],
+    [100000, "$100,000"],
+    [1234567, "$1,234,567"],
+    [1499.5, "$1,500"],
+    [-500, "-$500"],
+  ])("formats %s as %s", (dollars, text) => {
+    expect(formatUsdt(dollars)).toBe(text);
   });
 });
 

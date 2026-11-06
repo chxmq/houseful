@@ -1,6 +1,6 @@
 const TZ = "Asia/Kolkata";
 
-const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+const usdt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const weekday = new Intl.DateTimeFormat("en-IN", { weekday: "short", timeZone: TZ });
 const dayMonth = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", timeZone: TZ });
 const longDate = new Intl.DateTimeFormat("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: TZ });
@@ -10,7 +10,7 @@ const monShort = new Intl.DateTimeFormat("en-IN", { month: "short", timeZone: TZ
 
 const at = (s: number) => new Date(s * 1000);
 
-export const formatInr = (rupees: number) => inr.format(rupees);
+export const formatUsdt = (dollars: number) => usdt.format(dollars);
 export const formatWeekday = (s: number) => weekday.format(at(s));
 export const formatDayMonth = (s: number) => dayMonth.format(at(s));
 export const formatLongDate = (s: number) => longDate.format(at(s));

@@ -3,7 +3,7 @@ export type Assurance = "selfie" | "human";
 export type AssuranceInput = {
   status: string;
   capacity: number;
-  priceInr: number;
+  priceUsd: number;
 };
 
 /**
@@ -17,7 +17,7 @@ export type AssuranceInput = {
  */
 export function assuranceFor(event: AssuranceInput): Assurance {
   if (event.status === "sold_out") return "human";
-  if (event.capacity >= 5000 && event.priceInr >= 1500) return "human";
+  if (event.capacity >= 5000 && event.priceUsd >= 18) return "human";
   return "selfie";
 }
 

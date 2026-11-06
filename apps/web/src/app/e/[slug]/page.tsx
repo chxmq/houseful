@@ -8,7 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { TicketPanel } from "@/components/ticket-panel";
 import { assuranceCopy, assuranceFor } from "@/lib/assurance";
-import { categoryLabel, formatInr, formatLongDate, formatTime } from "@/lib/format";
+import { categoryLabel, formatUsdt, formatLongDate, formatTime } from "@/lib/format";
 import { event as getEvent } from "@/server/queries";
 
 export async function generateMetadata({ params }: PageProps<"/e/[slug]">) {
@@ -89,8 +89,8 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
               id: e.id,
               title: e.title,
               chainEventId: e.chainEventId,
-              priceInr: e.priceInr,
-              faceValueWei: e.faceValueWei,
+              priceUsd: e.priceUsd,
+              faceValueUnits: e.faceValueUnits,
               capacity: e.capacity,
               sold: e.sold,
               status: e.status,
@@ -105,7 +105,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
               The rules on this ticket
             </h2>
             <ol className="mt-4 divide-y divide-dashed divide-ink/25 rounded-[4px] bg-paper-deep px-5 font-mono text-[13px] leading-relaxed">
-              <Rule n={1} title={`${formatInr(e.priceInr)}, for everyone, forever`}>
+              <Rule n={1} title={`${formatUsdt(e.priceUsd)}, for everyone, forever`}>
                 The price is fixed in the contract when the show is listed. The host cannot raise it later and nobody can
                 resell above it.
               </Rule>

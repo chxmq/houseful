@@ -18,7 +18,7 @@ export default async function TicketsPage() {
       title: e.title,
       startsAt: e.startsAt,
       doorsAt: e.doorsAt,
-      priceInr: e.priceInr,
+      priceUsd: e.priceUsd,
       venue: e.venue.name,
     }));
 

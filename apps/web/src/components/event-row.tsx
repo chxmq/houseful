@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { categoryLabel, formatDayNum, formatInr, formatMonShort, formatTime, formatWeekday } from "@/lib/format";
+import { categoryLabel, formatDayNum, formatUsdt, formatMonShort, formatTime, formatWeekday } from "@/lib/format";
 import { RuleReveal } from "./motion/reveal";
 
 export type EventRowData = {
@@ -8,7 +8,7 @@ export type EventRowData = {
   subtitle: string | null;
   category: string;
   startsAt: number;
-  priceInr: number;
+  priceUsd: number;
   capacity: number;
   sold: number;
   status: string;
@@ -61,7 +61,7 @@ export function EventRow({ event, index = 0 }: { event: EventRowData; index?: nu
         </p>
 
         <div className="col-start-2 flex items-baseline gap-3 md:col-start-auto md:block md:text-right">
-          <p className="font-mono text-base font-medium">{formatInr(event.priceInr)}</p>
+          <p className="font-mono text-base font-medium">{formatUsdt(event.priceUsd)}</p>
           <p className={`font-mono text-[11px] uppercase tracking-[0.14em] ${toneClass[a.tone]}`}>{a.label}</p>
         </div>
       </Link>
