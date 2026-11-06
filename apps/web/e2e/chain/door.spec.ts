@@ -1,34 +1,13 @@
 /**
  * Done-means 7: the ticket shows its seat and a door code that rotates, and the door admits it once, turns away
  * a repeat, turns away a code that is too old, and goes on doing so with no network.
- *
- * The code on the ticket is a QR. "Copy code" puts the same text on the clipboard, and the scanner has a box to
- * paste it into, so the spec carries the code from one phone to the other the way a person would.
  */
 import { DOOR_PAYLOAD_LENGTH } from "@houseful/pass";
-import type { Page } from "@playwright/test";
 import { test, expect } from "../support/fixtures";
 import { deviceWalletAddress, expectNoHorizontalScroll } from "../support/page";
+import { answer, copyDoorCode, scan, syncDoor } from "./door";
 import { buyTicket, choosePay, openShow, openTickets, pickSeat } from "./helpers";
 import { listShow } from "./host";
-
-/** Copies the code on the ticket and returns it. The clipboard is emptied first, so an older copy is never mistaken for this one. */
-async function copyDoorCode(ticket: Page): Promise<string> {
-  const clipboard = () => ticket.evaluate(() => navigator.clipboard.readText());
-  await ticket.evaluate(() => navigator.clipboard.writeText(""));
-  await ticket.getByRole("button", { name: "Copy code" }).click();
-  await expect.poll(clipboard).not.toBe("");
-  return clipboard();
-}
-
-/** Pastes a code into the door's box and presses Check. */
-async function scan(door: Page, code: string) {
-  await door.getByPlaceholder("Paste the code from a ticket screen").fill(code);
-  await door.getByRole("button", { name: "Check" }).click();
-}
-
-/** The full screen answer the scanner gives for a moment after a check. (The page's route announcer is an empty alert.) */
-const answer = (door: Page) => door.getByRole("alert").filter({ hasText: /\S/ });
 
 test("the ticket shows its seat and a rotating code, and the door admits it once", async ({ page, context, device, chain }) => {
   test.setTimeout(150_000);
@@ -56,9 +35,7 @@ test("the ticket shows its seat and a rotating code, and the door admits it once
 
   // The door is another phone. It syncs the show while it has signal.
   const door = await device();
-  await door.page.goto(`/door/${show.slug}`);
-  await door.page.getByRole("button", { name: "Sync this show" }).click();
-  await expect(door.page.getByRole("heading", { name: "Ready to scan offline" })).toBeVisible();
+  await syncDoor(door.page, show.slug);
 
   // The first scan lets the ticket in.
   await scan(door.page, code);

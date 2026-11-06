@@ -61,18 +61,3 @@ export async function handBack(page: Page) {
   await page.getByRole("button", { name: /^Hand back for \$\d+$/ }).click();
   await expect(page.getByText(/^Refunded \$\d+\./)).toBeVisible({ timeout: 60_000 });
 }
-
-// Used by the specs that are not rewritten yet. Each goes when its last spec does.
-export const phone = { width: 375, height: 812 };
-export const desktop = { width: 1280, height: 800 };
-
-export async function verifyAndBuy(page: Page) {
-  const verify = page.getByRole("button", {
-    name: /Get tickets|Get Seat|Take a returned seat|Join the waitlist|Verify and buy/i,
-  });
-  await expect(verify).toBeVisible({ timeout: 30_000 });
-  await verify.click();
-  await expect(
-    page.getByText(/Open your ticket|Paid face value|Bound this phone|Seat \d+ selected|General admission|You are on the waitlist|Your place in line/i).first(),
-  ).toBeVisible({ timeout: 120_000 });
-}

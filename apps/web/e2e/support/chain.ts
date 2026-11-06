@@ -100,6 +100,16 @@ export function createChain(rpcUrl: string = URLS.rpc) {
       });
       return waiting ? Number(position) : null;
     },
+    /** How often the ticket's door key was replaced or its seat changed hands. The door refuses codes of an older generation. */
+    generationOf: async (chainEventId: number, ticketId: number) => {
+      const [, , generation] = await publicClient.readContract({
+        address: contract,
+        abi: housefulAbi,
+        functionName: "getTicket",
+        args: [BigInt(chainEventId), BigInt(ticketId)],
+      });
+      return Number(generation);
+    },
     /** What the contract holds for the show: `proceeds` backs held seats, `escrow` backs waitlist places. USDT units. */
     ledger: async (chainEventId: number) => {
       const [proceeds, escrow] = await publicClient.readContract({

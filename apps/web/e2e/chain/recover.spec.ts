@@ -1,50 +1,68 @@
 /**
- * Done-means 10: ticket recovery moves a ticket to a new wallet; the old door
- * code stops working.
+ * Done-means 10: a ticket moves to a new phone, and the code on the old phone stops working at the door.
+ *
+ * The app's way to do this is on the wallet page: export the wallet on the old phone, import it on the new one, and
+ * press "Move it to this phone", which puts the new phone's key on the ticket. The contract also has `recoverTicket`
+ * for a brand new wallet proved with World ID, but no page calls it (ticket-actions.ts defines it, and the verify
+ * route only signs buy, join and claim), so there is nothing to drive for that.
  */
 import { test, expect } from "../support/fixtures";
-import { choosePay, desktop, openShow, openTickets, phone, pickSeat, verifyAndBuy } from "./helpers";
+import { deviceWalletAddress, deviceWalletKey } from "../support/page";
+import { answer, copyDoorCode, scan, syncDoor } from "./door";
+import { buyTicket, choosePay, openShow, openTickets, pickSeat } from "./helpers";
+import { listShow } from "./host";
 
-const SLUG = process.env.E2E_RECOVER_SLUG ?? "tatkaar-ncpa";
+test("moving a ticket to a new phone stops the old code and admits the new one", async ({ page, context, device, chain }) => {
+  test.setTimeout(150_000);
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 
-test.describe("ticket recovery", () => {
-  for (const viewport of [
-    { name: "phone", size: phone },
-    { name: "desktop", size: desktop },
-  ]) {
-    test.describe(viewport.name, () => {
-      test.use({ viewport: viewport.size });
+  // The fan buys on the old phone and copies the code the door would be shown.
+  const show = await listShow((await device()).page, chain, { capacity: 5 });
+  await openShow(page, show.slug);
+  await pickSeat(page);
+  await choosePay(page, "usdt");
+  await buyTicket(page);
+  const wallet = await deviceWalletAddress(page);
+  const ticketId = await chain.read.ticketOf(show.chainEventId, wallet);
+  expect(ticketId).not.toBeNull();
+  const ticketNo = `No. ${String(ticketId! + 1).padStart(4, "0")}`;
+  expect(await chain.read.generationOf(show.chainEventId, ticketId!)).toBe(0);
+  await openTickets(page);
+  const oldCode = await copyDoorCode(page);
 
-      test("recover moves the ticket and invalidates the old door code", async ({ page, context }) => {
-        test.skip(!process.env.E2E_RECOVER_READY, "needs product account recovery + World stub");
+  // The old phone exports its wallet.
+  await page.getByRole("button", { name: "Export wallet" }).click();
+  const secret = (await page.locator("pre").innerText()).trim();
+  expect(secret).toBe(await deviceWalletKey(page));
 
-        await openShow(page, SLUG);
-        await pickSeat(page);
-        await choosePay(page, "usdt");
-        await verifyAndBuy(page);
-        await openTickets(page);
-        const oldCode = page.locator("[data-door-code], .door-code").first();
-        await expect(oldCode).toBeVisible({ timeout: 30_000 });
-        const stale = (await oldCode.innerText()).trim();
+  // The new phone has its own wallet and sees nothing, until it imports the old phone's.
+  const newPhone = await device();
+  await newPhone.context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await openTickets(newPhone.page);
+  await expect(newPhone.page.getByText("Nothing booked yet")).toBeVisible();
+  await newPhone.page.getByLabel("Import on this phone").fill(secret);
+  await newPhone.page.getByRole("button", { name: "Import and reload" }).click();
+  await expect(newPhone.page.getByText("The door key on this ticket belongs to another phone.")).toBeVisible();
+  expect(await deviceWalletAddress(newPhone.page)).toBe(wallet);
 
-        // Product harness: sign in on a fresh wallet / clear device key, then recover.
-        await page.goto("/account");
-        await page.getByRole("button", { name: /Recover ticket|Move ticket/i }).click();
-        await expect(page.getByText(/moved|recovered|new wallet/i).first()).toBeVisible({
-          timeout: 120_000,
-        });
+  // Moving the ticket puts the new phone's key on it, and the new phone shows a live code.
+  await newPhone.page.getByRole("button", { name: "Move it to this phone" }).click();
+  await expect(newPhone.page.getByText("This phone is now the key for your ticket.")).toBeVisible();
+  await expect(newPhone.page.getByText(/^New code in \d+s$/)).toBeVisible();
+  expect(await chain.read.generationOf(show.chainEventId, ticketId!)).toBe(1);
 
-        await openTickets(page);
-        await expect(page.getByText(/Seat \d+|General admission/i).first()).toBeVisible();
+  // The door syncs after the move, so it knows the old key is out. The old code is turned away and the new one is let in.
+  const door = await device();
+  await syncDoor(door.page, show.slug);
+  const newCode = await copyDoorCode(newPhone.page);
+  expect(newCode).not.toBe(oldCode);
 
-        const door = await context.newPage();
-        await door.goto("/door");
-        await door.locator("input").first().fill(stale);
-        await door.getByRole("button", { name: /Admit|Check|Scan/i }).click();
-        await expect(door.getByText(/reject|invalid|stale|not found/i).first()).toBeVisible({
-          timeout: 15_000,
-        });
-      });
-    });
-  }
+  await scan(door.page, oldCode);
+  await expect(answer(door.page)).toContainText(/No\s*entry/);
+  await expect(answer(door.page)).not.toContainText("Code expired"); // refused because the key moved, not because the code is old
+  await expect(answer(door.page)).toBeHidden();
+
+  await scan(door.page, newCode);
+  await expect(answer(door.page)).toContainText("Admit");
+  await expect(answer(door.page)).toContainText(ticketNo);
 });
