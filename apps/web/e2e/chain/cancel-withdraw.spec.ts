@@ -20,13 +20,13 @@ test.describe("cancel and withdraw", () => {
         await expect(page.getByText(/cancelled/i).first()).toBeVisible({ timeout: 60_000 });
 
         await openTickets(page);
-        await page.getByRole("button", { name: /Claim .*USDT/i }).click();
+        await page.getByRole("button", { name: /Claim \$\d+/i }).click();
         await expect(page.getByText(/back in .*wallet|Refunded/i).first()).toBeVisible({
           timeout: 120_000,
         });
       });
 
-      test("after the show ends the host withdraws USDT", async ({ page }) => {
+      test("after the show ends the host withdraws proceeds", async ({ page }) => {
         test.skip(!process.env.E2E_ENDED_EVENT, "needs harness time-travel or ended fixture");
         await page.goto("/host");
         await page.getByRole("button", { name: /Withdraw proceeds/i }).click();
