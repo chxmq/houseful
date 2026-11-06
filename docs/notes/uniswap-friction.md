@@ -49,6 +49,8 @@ Unichain balance reached 3 ETH about **60 seconds** after the L1 receipt.
 - TestUSDT: `0x75a6Cb564AF5A94259238Ef62369E1BC30fDFD5a` (stable)
 - First Houseful (prove): `0x26fc1B16FaDE5B92B82CcF5eA598f5b9513430D1`
 - Final Houseful (empty for catalog seed): `0x6625C6c097C51d5E77f8Ba2E6AcD098e4B6a51ac`
+- HF-01/02/03 fix redeploy (catalog-ready): `0x8F9A0dfb0BC16526FB4df5d9774ea6D6e2aBa98e`
+  - prove buyWithEth: https://sepolia.uniscan.xyz/tx/0x8ca75ec0da716d5469bf4706232a47ee5eb19a0e3702055de304e0bfe785780f
 - Verifier: `0x805d719053f43b96631E8C617B45e41DA085d9F2`
 - Wrote `deployments/1301.json`
 

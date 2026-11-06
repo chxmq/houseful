@@ -31,6 +31,10 @@ contract ReentrantHolder {
         arg = arg_;
     }
 
+    function approveToken(address token, address spender, uint256 amount) external {
+        IERC20(token).approve(spender, amount);
+    }
+
     function buy(uint256 id, uint32 seat, uint256 nullifier, uint256 deadline, bytes calldata sig) external {
         houseful.buy(id, seat, nullifier, deadline, sig);
     }

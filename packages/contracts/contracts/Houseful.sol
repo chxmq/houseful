@@ -383,7 +383,8 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
             _assign(eventId, ticketId, to, w.nullifier, t.seat);
             emit WaitlistPromoted(eventId, position, ticketId, to);
         } else {
-            if (t.seat != 0) delete _seatTicketIdPlusOne[eventId][t.seat];
+            // Keep the seat reserved to this ticket while it sits in the returned pool so a
+            // fresh buy cannot mint a second live owner for the same seat (HF-01).
             t.owner = address(0);
             t.nullifier = 0;
             e.sold--;
@@ -746,6 +747,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     }
 
     function _swapEthForFaceValue(uint256 faceValue) private {
+        uint256 beforeBal = _usdtBalance();
         bytes[] memory data = new bytes[](2);
         data[0] = abi.encodeWithSelector(
             ISwapRouter02.exactOutputSingle.selector,
@@ -761,6 +763,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         );
         data[1] = abi.encodeWithSelector(ISwapRouter02.refundETH.selector);
         ISwapRouter02(swapRouter).multicall{value: msg.value}(data);
+        _requireUsdtIncrease(beforeBal, faceValue);
         uint256 dust = address(this).balance;
         if (dust > 0) {
             (bool ok, ) = payable(msg.sender).call{value: dust}("");

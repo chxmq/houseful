@@ -4,35 +4,29 @@ Reviewed 7 November 2026. Production contracts are unchanged.
 
 ## Findings
 
-### HF-01: High, two live tickets can own the same seat
+### HF-01: High, two live tickets can own the same seat — FIXED
 
-Scenario: a seated show has capacity four. Buy ticket 0 for seat 1, surrender before the show sells out, buy a newly minted ticket 1 for seat 1, then claim returned ticket 0. Both wallets now own seat 1. The seat index points to only the last assignment, so later surrender or cancellation refunds can also clear another holder's seat flag.
+Scenario: a seated show has capacity four. Buy ticket 0 for seat 1, surrender before the show sells out, buy a newly minted ticket 1 for seat 1, then claim returned ticket 0. Both wallets now own seat 1.
 
-File: `packages/contracts/contracts/Houseful.sol`, `surrender` at line 386, `buy` and `buyWithEth`, `claimReturned` at line 413 and `claimReturnedWithEth`.
+Fix applied: surrender into the returned pool no longer clears `_seatTicketIdPlusOne`. The seat stays reserved to the original ticket until `claimReturned` or a cancel refund. A fresh `buy` of that seat reverts `SeatTaken`.
 
-Fix: reserve each minted ticket's seat even while returned, distinguish a reserved seat from a live owner in the seat view, and require returned seats to be claimed through their original ticket. Alternatively route a purchase of a returned seat to that original ticket. Checking only at claim time prevents the duplicate but leaves the original ticket unusable while a replacement holds that seat.
+Evidence: `HF-01` in `test/invariants/Houseful.invariants.test.ts` asserts `SeatTaken` on the duplicate buy and a clean claim on the original ticket.
 
-Evidence: `HF-01` in `test/invariants/Houseful.invariants.test.ts` reproduces both live owners. This is an observed invariant failure, not a passing safety guarantee.
+### HF-02: High under a hostile router, unfunded ETH purchases and retained ETH — FIXED
 
-### HF-02: High under a hostile router, unfunded ETH purchases and retained ETH
+Scenario: a router whose multicall succeeds, sends no USDT and retains the buyer's ETH. Houseful previously minted and credited proceeds anyway.
 
-Scenario: configure a router whose multicall succeeds, sends no USDT and retains the buyer's ETH. Houseful mints a ticket and credits proceeds anyway. The buyer cannot surrender when the registry has no USDT. With pooled funds already present, the unfunded ticket can instead consume another event's USDT. The same unchecked credit occurs for waitlist joins and returned claims.
+Fix applied: `_swapEthForFaceValue` measures USDT balance before and after the multicall and reverts `WrongPayment` unless the balance rises by exactly face value. The whole call rolls back, so ETH is not retained.
 
-Files: `packages/contracts/contracts/Houseful.sol`, `_swapEthForFaceValue`; `packages/contracts/contracts/SaleEscrow.sol`, `_collectSaleFromBalance` at line 37 and `_collectEscrowFromBalance` at line 48.
+Evidence: `HF-02` asserts mint and proceeds stay zero and the router holds no ETH after the reverted dishonest swap. Nested reentry still hits the reentrancy guard.
 
-Fix: measure USDT balance before and after each swap, require the exact face value increase before crediting either ledger, and validate the configured router at deployment. Balance checks prevent missing output from committing. They cannot compel arbitrary external code to quote honestly, so the immutable router must still be trusted. Refund only the ETH attributable to this call.
+### HF-03: Medium under a hostile settlement token, successful calls do not prove payment — FIXED (incoming)
 
-Evidence: `HF-02` proves a reverting swap rolls back with no ETH retained, a successful dishonest swap creates an unfunded liability and retains ETH, and nested refund entry fails with the reentrancy guard's exact error selector.
+Scenario: an ERC20 returns success from transferFrom without moving tokens. A USDT purchase previously minted and credited proceeds.
 
-### HF-03: Medium under a hostile settlement token, successful calls do not prove payment
+Fix applied: `_pullUsdtExact` requires the contract balance to rise by exactly the face value on every incoming transfer. A token that refuses outgoing transfers can still block refunds; that remains a trusted-token deployment assumption.
 
-Scenario: an ERC20 returns success from transferFrom without moving tokens. A USDT purchase still mints and credits proceeds. A token that refuses outgoing transfers can block every refund indefinitely. The latter is an unavoidable dependency trust limit with an immutable settlement token.
-
-File: `packages/contracts/contracts/SaleEscrow.sol`, `_collectSale` at line 31, `_collectEscrow` at line 42, `_sendUsdt` at line 76.
-
-Fix: require exact balance increases on incoming transfers and deploy only with the intended, verified six-decimal token. A refund-credit fallback may isolate payout failure from ticket handover, but it cannot make an uncooperative token transfer. Describe the trusted token assumption explicitly.
-
-Evidence: `HF-03` reproduces the missing payment. The hostile payout test proves a failed refund preserves ownership and proceeds, and succeeds on retry after the token resumes transfers. Both incoming and outgoing callbacks hit the reentrancy guard. A permanently hostile token cannot be certified as unable to trap funds.
+Evidence: `HF-03` asserts `WrongPayment` with zero mint and zero proceeds. Hostile payout retry behaviour is unchanged.
 
 ## Coverage and accounting
 

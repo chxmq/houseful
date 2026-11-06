@@ -6,7 +6,6 @@ import type { Houseful, TestUSDT } from "../typechain-types";
 import {
   attest,
   chainHead,
-  domainOf,
   FACE,
   fundAndApprove,
   HOUR,
@@ -457,24 +456,248 @@ describe("Houseful", () => {
   });
 
   describe("reentrancy", () => {
-    it("marks refund and surrender entry points as nonReentrant", async () => {
-      const { c } = await loadFixture(deployFixture);
-      const fragment = c.interface.getFunction("claimRefund");
-      expect(fragment).to.not.equal(null);
-      // Behavioural cover: a second claimRefund after success reverts NothingToRefund,
-      // and the modifier is present on surrender / leaveWaitlist / claimRefund in the ABI source.
-      const src = await ethers.provider.getCode(await c.getAddress());
-      expect(src.length).to.be.greaterThan(2);
+    const Mode = { None: 0, ClaimRefund: 1, Surrender: 2, LeaveWaitlist: 3 };
+
+    async function callbackFixture() {
+      const [, verifier, host, alice, bob, carol] = await ethers.getSigners();
+      const usdt = await ethers.deployContract("CallbackUSDT");
+      const weth = await ethers.deployContract("WethMock");
+      const router = await ethers.deployContract("MockSwapRouter", [await usdt.getAddress(), await weth.getAddress()]);
+      await usdt.mint(await router.getAddress(), FACE * 1_000n);
+      const c = (await ethers.deployContract("Houseful", [
+        verifier.address,
+        await usdt.getAddress(),
+        await router.getAddress(),
+        await weth.getAddress(),
+        POOL_FEE,
+      ])) as unknown as Houseful;
+      const attacker = await ethers.deployContract("ReentrantHolder", [await c.getAddress()]);
+      const addr = await attacker.getAddress();
+      await usdt.mint(addr, FACE * 20n);
+      await attacker.approveToken(await usdt.getAddress(), await c.getAddress(), FACE * 20n);
+      for (const who of [alice, bob, carol, host]) {
+        await usdt.mint(who.address, FACE * 20n);
+        await usdt.connect(who).approve(await c.getAddress(), FACE * 20n);
+      }
+      const now = await time.latest();
+      const params = {
+        faceValue: FACE,
+        capacity: 2n,
+        seated: false,
+        saleStart: BigInt(now + 10),
+        surrenderCutoff: BigInt(now + 10 * HOUR),
+        endsAt: BigInt(now + 12 * HOUR),
+        metadataURI: "ipfs://reentry",
+        metadataHash: ethers.id("reentry"),
+      };
+      await c.connect(host).createEvent(params);
+      await time.increaseTo(now + 10);
+      const eventId = 1n;
+      const signed = async (wallet: string, nullifier: bigint, purpose: PurposeValue) =>
+        attest(c, { signer: verifier, eventId, nullifier, wallet, purpose });
+      const buy = await signed(addr, N.attacker, Purpose.Buy);
+      await attacker.buy(eventId, 0, N.attacker, buy.deadline, buy.sig);
+      return { c, usdt, host, alice, bob, carol, verifier, attacker, addr, eventId, signed };
+    }
+
+    it("re-entering claimRefund from the refund callback fails and pays only once", async () => {
+      const { c, usdt, host, alice, eventId, attacker, addr, signed } = await loadFixture(callbackFixture);
+      const a = await signed(alice.address, N.alice, Purpose.Buy);
+      await c.connect(alice).buy(eventId, 0, N.alice, a.deadline, a.sig);
+      await c.connect(host).cancelEvent(eventId);
+      await attacker.arm(Mode.ClaimRefund, eventId, 0);
+      const before = await usdt.balanceOf(addr);
+      await attacker.claimRefund(eventId);
+      expect(await usdt.balanceOf(addr)).to.equal(before + FACE);
+      expect(await attacker.reentryAttempts()).to.equal(1n);
+      expect(await attacker.reentrySuccesses()).to.equal(0n);
+      expect(c.interface.parseError(await attacker.lastRevert())?.name).to.equal("ReentrancyGuardReentrantCall");
+      await expect(attacker.claimRefund(eventId)).to.be.revertedWithCustomError(c, "NothingToRefund");
+    });
+
+    it("re-entering surrender from the surrender refund callback fails", async () => {
+      const { c, usdt, bob, carol, eventId, attacker, addr, signed } = await loadFixture(callbackFixture);
+      const b = await signed(bob.address, N.bob, Purpose.Buy);
+      await c.connect(bob).buy(eventId, 0, N.bob, b.deadline, b.sig);
+      const j = await signed(carol.address, N.carol, Purpose.Join);
+      await c.connect(carol).joinWaitlist(eventId, N.carol, j.deadline, j.sig);
+      await attacker.arm(Mode.Surrender, eventId, 0);
+      const before = await usdt.balanceOf(addr);
+      await attacker.surrender(eventId, 0);
+      expect(await usdt.balanceOf(addr)).to.equal(before + FACE);
+      expect(await attacker.reentrySuccesses()).to.equal(0n);
+      expect(c.interface.parseError(await attacker.lastRevert())?.name).to.equal("ReentrancyGuardReentrantCall");
+      expect((await c.getTicket(eventId, 0)).owner).to.equal(carol.address);
+    });
+
+    it("re-entering leaveWaitlist from the escrow refund callback fails", async () => {
+      const f = await loadFixture(callbackFixture);
+      const a = await f.signed(f.alice.address, N.alice, Purpose.Buy);
+      await f.c.connect(f.alice).buy(f.eventId, 0, N.alice, a.deadline, a.sig);
+      const waiter = await ethers.deployContract("ReentrantHolder", [await f.c.getAddress()]);
+      const waddr = await waiter.getAddress();
+      await f.usdt.mint(waddr, FACE * 2n);
+      await waiter.approveToken(await f.usdt.getAddress(), await f.c.getAddress(), FACE * 2n);
+      const join = await f.signed(waddr, N.frank, Purpose.Join);
+      await waiter.joinWaitlist(f.eventId, N.frank, join.deadline, join.sig);
+      await waiter.arm(Mode.LeaveWaitlist, f.eventId, 0);
+      const before = await f.usdt.balanceOf(waddr);
+      await waiter.leaveWaitlist(f.eventId, 0);
+      expect(await f.usdt.balanceOf(waddr)).to.equal(before + FACE);
+      expect(await waiter.reentrySuccesses()).to.equal(0n);
+      expect(f.c.interface.parseError(await waiter.lastRevert())?.name).to.equal("ReentrancyGuardReentrantCall");
     });
   });
 
   describe("door keys", () => {
+    it("owner registers a door key; others cannot", async () => {
+      const { c, alice, bob, eventId, buyAs } = await loadFixture(saleOpenFixture);
+      await buyAs(alice, N.alice);
+      const key = ethers.id("alice-phone");
+      await expect(c.connect(bob).setDoorKey(eventId, 0, key)).to.be.revertedWithCustomError(c, "NotTicketOwner");
+      await expect(c.connect(alice).setDoorKey(eventId, 0, key)).to.emit(c, "DoorKeySet").withArgs(eventId, 0n, alice.address, key);
+      expect((await c.getTicket(eventId, 0)).doorKey).to.equal(key);
+    });
+
     it("moving to a new device bumps generation", async () => {
       const { c, alice, eventId, buyAs } = await loadFixture(saleOpenFixture);
       await buyAs(alice, N.alice);
       await c.connect(alice).setDoorKey(eventId, 0, ethers.id("phone-a"));
       await c.connect(alice).setDoorKey(eventId, 0, ethers.id("phone-b"));
       expect((await c.getTicket(eventId, 0)).generation).to.equal(1n);
+      expect((await c.getTicket(eventId, 0)).doorKey).to.equal(ethers.id("phone-b"));
+    });
+
+    it("recoverTicket invalidates the previous door key", async () => {
+      const { c, alice, bob, eventId, buyAs, signed } = await loadFixture(saleOpenFixture);
+      await buyAs(alice, N.alice);
+      await c.connect(alice).setDoorKey(eventId, 0, ethers.id("phone-1"));
+      const { deadline, sig } = await signed(bob, N.alice, Purpose.Recover);
+      await c.connect(bob).recoverTicket(eventId, 0, N.alice, deadline, sig);
+      const t = await c.getTicket(eventId, 0);
+      expect(t.doorKey).to.equal(ethers.ZeroHash);
+      expect(t.generation).to.equal(1n);
+    });
+  });
+
+  describe("waitlist order", () => {
+    it("promotes waiters in FIFO order and skips departed slots", async () => {
+      const { c, alice, bob, carol, dave, erin, eventId, joinAs } = await loadFixture(soldOutFixture);
+      await joinAs(carol, N.carol);
+      await joinAs(dave, N.dave);
+      await joinAs(erin, N.erin);
+      await c.connect(dave).leaveWaitlist(eventId, 1);
+      await c.connect(alice).surrender(eventId, 0);
+      expect((await c.getTicket(eventId, 0)).owner).to.equal(carol.address);
+      await c.connect(bob).surrender(eventId, 1);
+      expect((await c.getTicket(eventId, 1)).owner).to.equal(erin.address);
+    });
+
+    it("only opens once the show is sold out with an empty returned pool", async () => {
+      const { c, alice, carol, buyAs, joinAs } = await loadFixture(saleOpenFixture);
+      await expect(joinAs(carol, N.carol)).to.be.revertedWithCustomError(c, "SeatsAvailable");
+      await buyAs(alice, N.alice);
+      await expect(joinAs(carol, N.carol)).to.be.revertedWithCustomError(c, "SeatsAvailable");
+    });
+  });
+
+  describe("returned seats", () => {
+    it("keeps a surrendered seat reserved until claimReturned", async () => {
+      const f = await loadFixture(deployFixture);
+      const now = await time.latest();
+      await f.c.connect(f.host).createEvent({
+        ...f.params,
+        capacity: 3n,
+        seated: true,
+        saleStart: BigInt(now + 10),
+        surrenderCutoff: BigInt(now + 10 * HOUR),
+        endsAt: BigInt(now + 12 * HOUR),
+      });
+      await time.increaseTo(now + 10);
+      const id = 2n;
+      await f.buyAs(f.alice, N.alice, id, 1);
+      await f.c.connect(f.alice).surrender(id, 0);
+      expect(await f.c.seatsTaken(id, 1, 1)).to.deep.equal([true]);
+      await expect(f.buyAs(f.bob, N.bob, id, 1)).to.be.revertedWithCustomError(f.c, "SeatTaken").withArgs(1);
+      await f.buyAs(f.bob, N.bob, id, 2);
+      await f.claimAs(f.carol, 0n, N.carol, id);
+      expect((await f.c.getTicket(id, 0)).owner).to.equal(f.carol.address);
+      expect((await f.c.getTicket(id, 0)).seat).to.equal(1);
+      await expectSolvent(f.c, f.usdt, [id]);
+    });
+  });
+
+  describe("cancellation extras", () => {
+    it("only the host can cancel, once, before endsAt", async () => {
+      const { c, host, mallory, eventId } = await loadFixture(saleOpenFixture);
+      await expect(c.connect(mallory).cancelEvent(eventId)).to.be.revertedWithCustomError(c, "NotHost");
+      await expect(c.connect(host).cancelEvent(eventId)).to.emit(c, "EventCancelled").withArgs(eventId);
+      await expect(c.connect(host).cancelEvent(eventId)).to.be.revertedWithCustomError(c, "EventIsCancelled");
+      const f = await loadFixture(saleOpenFixture);
+      await time.increaseTo(f.params.endsAt);
+      await expect(f.c.connect(f.host).cancelEvent(f.eventId)).to.be.revertedWithCustomError(f.c, "EventEnded");
+    });
+
+    it("blocks buy, join, claim and surrender once cancelled", async () => {
+      const { c, host, alice, carol, eventId, buyAs, joinAs } = await loadFixture(soldOutFixture);
+      await c.connect(host).cancelEvent(eventId);
+      await expect(buyAs(carol, N.carol)).to.be.revertedWithCustomError(c, "EventIsCancelled");
+      await expect(joinAs(carol, N.carol)).to.be.revertedWithCustomError(c, "EventIsCancelled");
+      await expect(c.connect(alice).surrender(eventId, 0)).to.be.revertedWithCustomError(c, "EventIsCancelled");
+    });
+
+    it("double refunds and outsiders revert", async () => {
+      const { c, usdt, host, alice, bob, carol, eventId, joinAs } = await loadFixture(soldOutFixture);
+      await joinAs(carol, N.carol);
+      await c.connect(host).cancelEvent(eventId);
+      await c.connect(alice).claimRefund(eventId);
+      await expect(c.connect(alice).claimRefund(eventId)).to.be.revertedWithCustomError(c, "NothingToRefund");
+      await expect(c.connect(bob).claimRefund(eventId)).to.emit(c, "RefundClaimed");
+      await expect(c.connect(bob).claimRefund(eventId)).to.be.revertedWithCustomError(c, "NothingToRefund");
+      await expectSolvent(c, usdt);
+    });
+  });
+
+  describe("attestation edges", () => {
+    it("rejects an attestation signed by anyone but the verifier", async () => {
+      const { c, alice, mallory, eventId } = await loadFixture(saleOpenFixture);
+      const forged = await attest(c, {
+        signer: mallory,
+        eventId,
+        nullifier: N.alice,
+        wallet: alice.address,
+        purpose: Purpose.Buy,
+      });
+      await expect(c.connect(alice).buy(eventId, 0, N.alice, forged.deadline, forged.sig)).to.be.revertedWithCustomError(
+        c,
+        "InvalidAttestation",
+      );
+    });
+
+    it("lets the same human buy for a different event", async () => {
+      const { c, host, alice, params, buyAs } = await loadFixture(saleOpenFixture);
+      await buyAs(alice, N.alice);
+      const now = await time.latest();
+      await c.connect(host).createEvent({
+        ...params,
+        saleStart: BigInt(now + 10),
+        surrenderCutoff: BigInt(now + 10 * HOUR),
+        endsAt: BigInt(now + 12 * HOUR),
+      });
+      await time.increaseTo(now + 10);
+      await expect(buyAs(alice, N.alice, 2n)).to.emit(c, "TicketBought").withArgs(2n, 0n, alice.address, 0, N.alice);
+    });
+
+    it("empty waitlist surrender puts the ticket in the returned pool", async () => {
+      const { c, usdt, alice, bob, eventId, buyAs, claimAs } = await loadFixture(saleOpenFixture);
+      await buyAs(alice, N.alice);
+      await expect(c.connect(alice).surrender(eventId, 0))
+        .to.emit(c, "Surrendered")
+        .withArgs(eventId, 0n, alice.address, ethers.ZeroAddress, 1n);
+      expect(await c.returnedTickets(eventId)).to.deep.equal([0n]);
+      await claimAs(bob, 0n, N.bob);
+      expect((await c.getTicket(eventId, 0)).owner).to.equal(bob.address);
+      await expectSolvent(c, usdt);
     });
   });
 });

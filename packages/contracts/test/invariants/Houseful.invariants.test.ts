@@ -80,7 +80,17 @@ async function invariant(f: Awaited<ReturnType<typeof fixture>>) {
     // Cancelled liabilities are unclaimed refunds, already included in the ledger.
     const unclaimedRefunds = e.cancelled ? (held + waiting) * FACE : 0n;
     liabilities += e.cancelled ? unclaimedRefunds : (e.proceedsWithdrawn ? 0n : held * FACE) + waiting * FACE;
-    if (e.seated) expect(await f.c.seatsTaken(id, 1, 4)).to.deep.equal([1, 2, 3, 4].map(s => seats.has(s)));
+    if (e.seated) {
+      // Returned tickets keep their seat reserved until claim or cancel-refund (HF-01).
+      const reserved = new Set(seats);
+      for (const ticketId of await f.c.returnedTickets(id)) {
+        const t = await f.c.getTicket(id, ticketId);
+        expect(Number(t.seat)).to.be.greaterThan(0);
+        expect(reserved.has(Number(t.seat)), "returned seat reserved twice").to.equal(false);
+        reserved.add(Number(t.seat));
+      }
+      expect(await f.c.seatsTaken(id, 1, 4)).to.deep.equal([1, 2, 3, 4].map((s) => reserved.has(s)));
+    }
   }
   expect(await f.token.balanceOf(await f.c.getAddress())).to.equal(ledgerTotal);
   expect(ledgerTotal).to.equal(liabilities);
@@ -210,20 +220,23 @@ describe("seeded lifecycle invariants", function () {
   });
 });
 
-// Findings are executable reproductions, not assertions that these behaviours are safe.
-describe("contract review reproductions", () => {
-  it("HF-01: returned seat can have two live owners before capacity is minted", async () => {
+describe("contract review fixes", () => {
+  it("HF-01: a returned seat stays reserved and must be claimed on the original ticket", async () => {
     const f = await fixture();
     await f.buy(f.fans[0], 1, 1, 1n);
     await f.c.connect(f.fans[0]).surrender(1, 0);
-    await f.buy(f.fans[1], 1, 1, 2n);
+    expect(await f.c.seatsTaken(1, 1, 1)).to.deep.equal([true]);
+    await expect(f.buy(f.fans[1], 1, 1, 2n)).to.be.revertedWithCustomError(f.c, "SeatTaken").withArgs(1);
+    await f.buy(f.fans[1], 1, 2, 2n);
     const a = await f.signed(f.fans[2], 1, 3n, Purpose.Claim);
     await f.c.connect(f.fans[2]).claimReturned(1, 0, 3, a.deadline, a.sig);
     const original = await f.c.getTicket(1, 0);
-    const replacement = await f.c.getTicket(1, 1);
-    expect(original.seat).to.equal(replacement.seat);
+    const other = await f.c.getTicket(1, 1);
     expect(original.owner).to.equal(f.fans[2].address);
-    expect(replacement.owner).to.equal(f.fans[1].address);
+    expect(original.seat).to.equal(1n);
+    expect(other.owner).to.equal(f.fans[1].address);
+    expect(other.seat).to.equal(2n);
+    await invariant(f);
   });
 
   it("blocks token reentry and rolls a failed payout back so it can be retried", async () => {
@@ -246,30 +259,28 @@ describe("contract review reproductions", () => {
     expect(await f.token.callbackResult()).to.equal(ethers.id("ReentrancyGuardReentrantCall()").slice(0, 10));
   });
 
-  it("HF-02: a router can retain ETH and mint an unfunded ticket without reentry", async () => {
+  it("HF-02: a dishonest swap that retains ETH cannot mint or credit proceeds", async () => {
     const f = await fixture("TestUSDT", "HostileRouter");
     await f.router.configure(await f.c.getAddress(), f.c.interface.encodeFunctionData("claimRefund", [1]), true);
     await expect(f.buy(f.fans[0], 1, 1, 1n, true)).to.be.revertedWith("blocked swap");
     expect((await f.c.getEventInfo(1)).minted).to.equal(0n);
     expect(await ethers.provider.getBalance(await f.router.getAddress())).to.equal(0n);
     await f.router.configure(await f.c.getAddress(), f.c.interface.encodeFunctionData("claimRefund", [1]), false);
-    await f.buy(f.fans[0], 1, 1, 1n, true);
-    expect(await f.router.attempted()).to.equal(true);
-    expect(await f.router.entered()).to.equal(false);
-    expect(await f.router.callbackResult()).to.equal(ethers.id("ReentrancyGuardReentrantCall()").slice(0, 10));
+    // WrongPayment rolls the whole call back, so router storage also reverts; assert outcomes only.
+    await expect(f.buy(f.fans[0], 1, 1, 1n, true)).to.be.revertedWithCustomError(f.c, "WrongPayment");
+    expect((await f.c.getEventInfo(1)).minted).to.equal(0n);
+    expect((await f.c.ledger(1)).proceeds).to.equal(0n);
     expect(await f.token.balanceOf(await f.c.getAddress())).to.equal(0n);
-    expect((await f.c.ledger(1)).proceeds).to.equal(FACE);
-    expect(await ethers.provider.getBalance(await f.router.getAddress())).to.equal(ethers.parseEther("0.01"));
-    await expect(f.c.connect(f.fans[0]).surrender(1, 0)).to.be.reverted;
+    expect(await ethers.provider.getBalance(await f.router.getAddress())).to.equal(0n);
+    expect(await ethers.provider.getBalance(await f.c.getAddress())).to.equal(0n);
   });
 
-  it("HF-03: a token returning success without payment creates an unfunded liability", async () => {
+  it("HF-03: a token that reports success without moving funds cannot mint", async () => {
     const f = await fixture("HostileToken");
     await f.token.configure(await f.c.getAddress(), f.c.interface.encodeFunctionData("claimRefund", [1]), false, true);
-    await f.buy(f.fans[0], 1, 1, 1n);
+    await expect(f.buy(f.fans[0], 1, 1, 1n)).to.be.revertedWithCustomError(f.c, "WrongPayment");
+    expect((await f.c.getEventInfo(1)).minted).to.equal(0n);
+    expect((await f.c.ledger(1)).proceeds).to.equal(0n);
     expect(await f.token.balanceOf(await f.c.getAddress())).to.equal(0n);
-    expect((await f.c.ledger(1)).proceeds).to.equal(FACE);
-    expect(await f.token.entered()).to.equal(false);
-    expect(await f.token.callbackResult()).to.equal(ethers.id("ReentrancyGuardReentrantCall()").slice(0, 10));
   });
 });

@@ -28,9 +28,28 @@ abstract contract SaleEscrow {
 
     function _salePrice(uint256 eventId) internal view virtual returns (uint256);
 
+    /// @dev Pulls `amount` USDT and requires the contract balance to rise by exactly that much.
+    function _pullUsdtExact(uint256 amount) internal {
+        uint256 beforeBal = _usdt.balanceOf(address(this));
+        _usdt.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = _usdt.balanceOf(address(this)) - beforeBal;
+        if (received != amount) revert WrongPayment(amount, received);
+    }
+
+    /// @dev Credits `amount` only after proving the contract balance rose by exactly that much
+    /// since `beforeBal` (typically measured immediately before a swap or transfer).
+    function _requireUsdtIncrease(uint256 beforeBal, uint256 amount) internal view {
+        uint256 received = _usdt.balanceOf(address(this)) - beforeBal;
+        if (received != amount) revert WrongPayment(amount, received);
+    }
+
+    function _usdtBalance() internal view returns (uint256) {
+        return _usdt.balanceOf(address(this));
+    }
+
     function _collectSale(uint256 eventId) internal returns (uint256 price) {
         price = _salePrice(eventId);
-        _usdt.safeTransferFrom(msg.sender, address(this), price);
+        _pullUsdtExact(price);
         _ledgers[eventId].proceeds += price;
     }
 
@@ -41,7 +60,7 @@ abstract contract SaleEscrow {
 
     function _collectEscrow(uint256 eventId) internal returns (uint256 amount) {
         amount = _salePrice(eventId);
-        _usdt.safeTransferFrom(msg.sender, address(this), amount);
+        _pullUsdtExact(amount);
         _ledgers[eventId].escrow += amount;
     }
 

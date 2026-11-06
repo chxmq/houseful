@@ -2351,14 +2351,14 @@ export interface HousefulDeployment {
 
 export const deployments: Record<number, HousefulDeployment> = {
   "1301": {
-    "address": "0x6625C6c097C51d5E77f8Ba2E6AcD098e4B6a51ac",
+    "address": "0x8F9A0dfb0BC16526FB4df5d9774ea6D6e2aBa98e",
     "verifier": "0x805d719053f43b96631E8C617B45e41DA085d9F2",
     "usdt": "0x75a6Cb564AF5A94259238Ef62369E1BC30fDFD5a",
     "swapRouter": "0xd1AAE39293221B77B0C71fBD6dCb7Ea29Bb5B166",
     "quoter": "0x6Dd37329A1A225a6Fca658265D460423DCafBF89",
     "weth": "0x4200000000000000000000000000000000000006",
     "poolFee": 3000,
-    "blockNumber": 67144359
+    "blockNumber": 67150392
   },
   "4801": {
     "address": "0x75a6Cb564AF5A94259238Ef62369E1BC30fDFD5a",
