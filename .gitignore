@@ -15,6 +15,11 @@ packages/contracts/cache/
 packages/contracts/typechain-types/
 packages/contracts/ignition/deployments/chain-31337/
 
+# end to end runs: traces, screenshots, the optional HTML report and the disposable stack's build and logs
+test-results/
+playwright-report/
+.e2e/
+
 # local data
 *.db
 *.db-journal
