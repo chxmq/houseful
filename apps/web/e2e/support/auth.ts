@@ -18,6 +18,13 @@ export type SignedInFan = {
   accountId: string;
 };
 
+export type SignedInHost = {
+  /** The injected wallet that signed the challenge. */
+  wallet: FakeWallet;
+  /** The account id the app answered with: the wallet's address in lower case. */
+  accountId: string;
+};
+
 /** What the app's sign-in routes answer: an account on success, or the words shown to the person on failure. */
 type LoginAnswer = { ok?: boolean; accountId?: string; error?: string };
 
@@ -52,17 +59,17 @@ export async function signInFan(page: Page, world: WorldBridge, options: { perso
  * Signs a host in at /host/login by signing the app's challenge with an injected wallet, and waits for the host
  * console. Pass the wallet when the spec made one with the `wallet` fixture or `device().wallet()`, or `{ privateKey }`
  * to have this phone get a wallet with that key (a new one when the key is left out). A browser context holds one
- * wallet, so a phone that already has one must be given it. Returns the wallet, whose address is the host account.
+ * wallet, so a phone that already has one must be given it.
  */
-export async function signInHost(page: Page, host: FakeWallet | { privateKey?: Hex } = {}): Promise<FakeWallet> {
+export async function signInHost(page: Page, host: FakeWallet | { privateKey?: Hex } = {}): Promise<SignedInHost> {
   const wallet = host instanceof FakeWallet ? host : await FakeWallet.install(page.context(), host);
 
   await page.goto("/host/login");
   const answer = page.waitForResponse((res) => new URL(res.url()).pathname === "/api/account/host-login");
   await page.getByRole("button", { name: "Sign in with wallet" }).click();
-  await accountIdFrom(answer, "wallet sign-in");
+  const accountId = await accountIdFrom(answer, "wallet sign-in");
 
   await page.waitForURL("**/host");
   await expect(page.getByRole("heading", { name: "Host a show", level: 1 })).toBeVisible();
-  return wallet;
+  return { wallet, accountId };
 }
