@@ -1,157 +1,121 @@
 # Houseful
 
-**Tickets for people, not bots.**
+One person, one ticket per show, at a fixed price.
 
-Houseful is a face-value ticketing app. Every ticket belongs to one verified human, sells at a fixed price, and can only change hands by reselling at face value: the holder gets a full refund, and the next person on a public waitlist gets the seat in the same transaction. The door works offline with a code that rotates every 20 seconds. After a scanner has synced, older codes stop working there.
+Houseful is a testnet ticketing prototype built for ETHGlobal Mumbai 2026. Fans pick seats where offered, pay in test USDT or ETH, and return unwanted tickets before a cutoff. The “Resell at face value” action returns the ticket through the contract, refunds its face value in USDT and gives the same seat to the oldest active waiter in the same transaction, or puts it into the returned-ticket pool. Ordinary transfers and approvals revert.
 
-Built for [ETHGlobal Mumbai 2026](https://ethglobal.com/events/mumbai).
+The human check is a server trust boundary: the server verifies a World ID proof and signs an attestation that the contract accepts. The contract does not verify World ID itself. Selling a wallet key or lending an identity remains possible. See [the threat model](docs/threat-model.md).
 
-## Why
+## What is implemented
 
-Secondary markets and bots pull tickets away from people who would actually go. Hosts lose control of price. Fans who cannot make it either eat the loss or flip the seat at a markup.
+- Catalog, city and category pages, search and URL filters, event pages, checkout, a seat map, tickets, waitlist ledger, host listing and host console.
+- USDT settlement with six decimals. ETH payments use an exact-output Uniswap v3 swap. Refunds and host proceeds are paid in USDT.
+- Single-use, wallet-bound EIP-712 attestations, seat uniqueness, a public waitlist, cancellation refunds, and host withdrawal after the event ends.
+- A browser wallet with key export and import. The wallet and door signing key are stored in browser localStorage.
+- World ID fan sign-in at `/login`, browser-wallet host sign-in at `/host/login`, cookie sessions and an `/account` wallet-address list. `/tickets` and `/account` require a fan session; `/host` and `/host/new` require a host session.
+- Rotating door codes and a scanner that checks them locally after a sync. A synced scanner rejects older ownership generations. Screenshots can still work on a fresh scanner for about 20 to 40 seconds.
 
-Houseful writes the rules into a public contract instead:
+[The v2 specification](docs/specs/v2.md) includes work beyond the implementation. Account integration remains partial: adding a wallet address does not prove ownership and selecting it does not change the checkout signer. Delinking checks all catalog events for a held ticket, including ended shows, but ignores waitlist places and uncataloged events. The listing server action still lacks its own host-session gate. Host login proves an external browser wallet while host transactions still default to the device wallet. These seams are PENDING(account-integration).
 
-1. **Face value forever.** The price is fixed when the show is listed. Nobody resells above it.
-2. **One person, one ticket.** World ID keeps it to one ticket or waitlist place per human per show. The app never learns who you are.
-3. **Resell at face value.** Until the surrender cutoff, return the ticket, get the full price back, and promote the waitlist head in one transaction. Transfers and approvals revert.
-4. **Cancelled show, guaranteed refund.** Holders pull their money from the contract. Nobody, including the platform, can block it.
-5. **Entry by live code.** A rotating QR signed by the phone. Codes change every 20 seconds; synced scanners reject older ones. The scanner works with no network after a pre-door sync.
+Checkout first requests an attestation from the fan session and opens World verification when there is no suitable session credential. The session endpoint supports recovery signatures, but there is no complete recovery UI. Identity continuity between the login action and per-event fallback is PENDING(identity-continuity), so a finished person-based recovery flow and uniform one-person enforcement across those paths are not established. Signing in on another phone does not restore the device wallet key. Exporting and importing that existing key is the available backup path.
 
-## Identity
+The seed combines 21 source-backed research drafts with 28 sample shows, for 49 listings across 20 cities. Four cities have at least three bookable test listings. Every seeded listing has a chain event id, but assigning an id does not establish that the chain has been seeded. Real-event pages link to the official seller and say clearly that a Houseful booking gives no real admission. The research drafts have not been independently verified, and their dollar prices are test USDT amounts, not live seller quotes.
 
-- **Fans:** World ID is the account. Action `houseful-login` sets a signed `hf_session` cookie whose account id is the nullifier. No email or password. Fans buy and hold tickets under that id. Checkout first tries `/api/attest` from the session so a fan does not scan again per show when the stored credential is enough; otherwise World runs at checkout.
-- **Hosts:** separate wallet sign-in. The host signs a one-time challenge message; the session account id is the wallet. `/host` is host-only; `/tickets` and `/account` are fan-only.
-- **Wallets:** fans link, choose, and delink wallets under the World account. A wallet that still holds a live ticket cannot be delinked.
+Unknown public facts are shown as “Not published”, including unconfirmed start times, doors, end time, age, duration and venue capacity. Internal settings such as a 100-place test allocation or a fallback booking window are separate from official event facts. Dates display in each city's timezone; search calendar filters use that timezone, while the older city-page time-window helper still uses IST. Catalog counts and seeded attendance are not proof of real ticket sales. PENDING(returned-seat-checkout): a returned seated ticket is reserved on chain but disabled in the current seat picker; see [the checkout handoff](docs/notes/contract-review.md#integration-handoff). See [the import policy](docs/notes/catalog-import.md), [catalog builder](apps/web/scripts/worldwide-catalog.ts) and [published-fact rules](apps/web/src/lib/catalog-facts.ts).
 
-## Demo flow
+## Evidence and remaining demo work
 
-1. Open a city page, pick a show.
-2. Sign in with World ID (staging simulator works locally), or verify at checkout if you skip login.
-3. Buy at face value, or join the waitlist if it is sold out.
-4. Open **Your tickets**: see the rotating door code.
-5. Open `/door/[slug]` on a second device: scan, admit, reject a stale or repeat code.
-6. Resell at face value: refund lands, waitlist advances.
-7. Host console: sign in with the payout wallet, list a show, watch sales and waitlist, withdraw proceeds after `endsAt`.
+| Item | Recorded evidence and limit |
+| --- | --- |
+| Chain | Unichain Sepolia, chain id `1301`; [deployment record](packages/contracts/deployments/1301.json) |
+| Houseful | [`0x8F9A0dfb0BC16526FB4df5d9774ea6D6e2aBa98e`](https://sepolia.uniscan.xyz/address/0x8F9A0dfb0BC16526FB4df5d9774ea6D6e2aBa98e) |
+| Live Uniswap route | [Recorded ETH purchase transaction](https://sepolia.uniscan.xyz/tx/0x8ca75ec0da716d5469bf4706232a47ee5eb19a0e3702055de304e0bfe785780f), also documented in [FEEDBACK.md](FEEDBACK.md) |
+| World ID | The 7 November staging run recorded `/api/world/verify` returning 200 after simulator approval at 03:55:52 IST. This is staging proof verification, not a production World App run. |
+| Browser purchase after World verification | PENDING(live-purchase). That run failed at the USDT approval because the public RPC rejected `eth_sendTransaction`; no ticket was minted. The code now passes the wallet's local account through simulation so writes can be signed locally. A fresh successful live run is still needed. |
+| Alternative World path | In that run, declining in the simulator left the modal connecting; closing the modal showed “Verification was cancelled. Nothing was charged.” |
+| Second wallet, same simulated person | The second attempt received World HTTP 502, shown as “World rejected the proof (HTTP 502).” No faucet or purchase followed. This did not exercise the intended already-holds refusal because no ticket had been minted. |
+| Hosted demo and phone on another network | PENDING(hosted-check). [Hosting setup notes](docs/notes/hosting.md) describe the Vercel/Turso path; deployment credentials and a successful external-network check are not established here. |
+| Local verification, 7 November | Web typecheck passed; 237 web tests, 83 pass-library tests, 55 contract tests and 20 discovery browser checks passed. Discovery ran on desktop and 375px phone layouts, including a production build and all 49 local chain listings. Changed-file lint has no errors and two existing catalog warnings. |
+| Supplemental contract typecheck | Fails in the older `packages/contracts/scripts/seed-local.ts:41`, which omits `seated`. The contract tests pass independently. |
 
-## Monorepo
+The [World integration debrief](docs/notes/world-debrief.md) records time to first server verification, the failed payment, the simulator decline behavior and the second-wallet 502. It separates the observed staging proof success from the still PENDING live purchase and duplicate-ticket refusal. The highest-impact requested improvement is a visible copyable connection link with a completed, cancelled or failed status returned to the app.
 
-```
-houseful/
-├── apps/web                 Next.js app (catalog, fan flows, host console, door)
-├── packages/contracts       Houseful registry + escrow (Hardhat)
-├── packages/pass            Offline door credentials (@houseful/pass)
-└── docs/
-    ├── specs/v2.md          current product + chain target
-    └── notes/               friction logs (Uniswap, etc.)
-```
+## Uniswap integration
 
-| Package | Role |
-|---|---|
-| `apps/web` | Catalog, checkout, tickets, waitlist, host console, door scanner |
-| `@houseful/contracts` | On-chain events, tickets, waitlist, surrender, refunds, proceeds |
-| `@houseful/pass` | ed25519 door credentials + rotating QR verifier (browser and Node) |
+The exact swap implementation is [`_swapEthForFaceValue` in Houseful.sol](packages/contracts/contracts/Houseful.sol). It calls SwapRouter02 `multicall` with `exactOutputSingle` followed by `refundETH`, checks the exact USDT balance increase, and returns remaining ETH to the buyer. The [checkout action library](apps/web/src/lib/ticket-actions.ts) quotes through QuoterV2 and adds 2% headroom. Local tests use `MockSwapRouter` at a fixed rate; that is separate from the live transaction above.
 
-More detail: [`packages/contracts/README.md`](packages/contracts/README.md), [`packages/pass/README.md`](packages/pass/README.md).
+The [pool script](packages/contracts/scripts/seed-pool.ts), [live purchase script](packages/contracts/scripts/prove-uniswap.ts), [integration notes](docs/notes/uniswap-friction.md) and [developer feedback](FEEDBACK.md) describe the route and the recorded transactions. Test USDT is a deployed test token, not official Tether or real dollars.
 
-## How the pieces fit
+## Repository
 
-```
-Fan / host browser
-        │
-        ▼
-   apps/web (Next.js)
-        │  World ID login (or checkout proof) ──► backend verifies ──► EIP-712 attestation
-        │  wallet signs buy / join / claim / surrender
-        ▼
-   Houseful.sol  (+ SaleEscrow per event)
-        │
-        ├── ticket bound to nullifier (one human per event)
-        ├── face-value sale only
-        └── surrender → refund + waitlist claim in one tx
+| Path | Responsibility |
+| --- | --- |
+| `apps/web` | Next.js 16, React 19, Tailwind 4, Drizzle/libSQL, IDKit and viem |
+| `packages/contracts` | Solidity registry, USDT ledger, deployment records, Hardhat tests and invariant tests |
+| `packages/pass` | ed25519 credentials, rotating QR payloads and local verification |
+| `apps/web/e2e` | Playwright stack, network-edge World stubs, browser-wallet harness and flow specs |
+| `docs` | [Architecture](docs/architecture.md), [threat model](docs/threat-model.md), specs and integration notes |
 
-Door phone                          Scanner (offline after sync)
-   pass credential + device key ──► rotating QR ──► Verifier.check()
-```
+## Run locally
 
-World ID proofs are verified by the Houseful backend. After a successful verify (login or checkout), the backend signs an EIP-712 `Attestation(eventId, nullifier, wallet, purpose, deadline)` with the platform verifier key. The contract checks that signature; it does not talk to World itself.
-
-## Stack
-
-- **App:** Next.js 16, React 19, Tailwind 4, Drizzle + libSQL, wagmi / viem, Motion
-- **Identity:** World ID (IDKit) + signed session + server attestation
-- **Contracts:** Solidity, Hardhat, OpenZeppelin
-- **Door:** `@houseful/pass` (ed25519, 20s windows)
-- **Package manager:** pnpm 11, Node ≥ 24
-
-**Chain today:** Unichain Sepolia (`1301`) is the live demo network. Local Hardhat (`31337`) remains for tests. World Chain Sepolia (`4801`) deploy is kept for reference.
-
-### Deployments
-
-| Chain | Id | Houseful |
-|---|---|---|
-| Hardhat local | 31337 | see `packages/contracts/deployments/31337.json` |
-| Unichain Sepolia | 1301 | `0x8F9A0dfb0BC16526FB4df5d9774ea6D6e2aBa98e` |
-| World Chain Sepolia | 4801 | `0x75a6Cb564AF5A94259238Ef62369E1BC30fDFD5a` |
-
-## Quick start
-
-### 1. Install
+Use Node 24 or newer and pnpm `11.28.9` as declared in the root package manifest.
 
 ```sh
 pnpm install
-```
-
-### 2. Contracts (local)
-
-```sh
-# terminal 1
-pnpm --filter @houseful/contracts node
-
-# terminal 2
-pnpm --filter @houseful/contracts deploy:local
-pnpm --filter @houseful/contracts seed:local
-```
-
-Without `VERIFIER_ADDRESS` / `VERIFIER_PRIVATE_KEY`, local deploy uses Hardhat account 1 as the verifier and prints its key for the web app.
-
-### 3. Web app
-
-```sh
 cp apps/web/.env.example apps/web/.env.local
-# set NEXT_PUBLIC_HOUSEFUL_ADDRESS from the deploy output
-# DOOR_ISSUER_SECRET_KEY: 32-byte hex ed25519 secret
+```
 
+Fill the World app and relying-party settings, the matching attester key and a fresh 32-byte hex door issuer secret in the local environment file. Set both `NEXT_PUBLIC_RPC_URL` and `RPC_URL` to `http://127.0.0.1:8550`, and both chain id settings to `31337`. Keep secrets out of source control. The sample Hardhat keys are public development keys and must only be used on a local throwaway chain. The deployment's `verifier` must match the account behind `ATTESTER_PRIVATE_KEY`.
+
+Start the local chain in one terminal:
+
+```sh
+pnpm --filter @houseful/contracts exec hardhat node --port 8550
+```
+
+In another terminal, deploy, initialise the database and seed the catalog's chain events:
+
+```sh
+LOCAL_RPC_URL=http://127.0.0.1:8550 pnpm --filter @houseful/contracts deploy:local
 pnpm --filter web db:push
 pnpm --filter web db:seed
-pnpm dev
+pnpm --filter web exec tsx scripts/seed-chain.ts
+pnpm --filter web dev --port 3300
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [localhost:3300](http://localhost:3300). Use the deployment record or set `NEXT_PUBLIC_HOUSEFUL_ADDRESS` to the newly deployed address. Keep browser `NEXT_PUBLIC_CHAIN_ID` / `NEXT_PUBLIC_RPC_URL` aligned with server `CHAIN_ID` / `RPC_URL`. The generated deployment exports provide the settlement token and router settings; overrides are read in [contract.ts](apps/web/src/lib/contract.ts).
 
-Useful scripts from the repo root:
+Use the web `seed-chain.ts` path above rather than the older contracts `seed:local` script: the latter still contains the previous ETH-era event shape. On a fresh local chain, the web seed signs synthetic identities directly with the attester key. Those holders and waiters have not passed World ID. It also uses reduced chain allocations, so catalog venue capacity and chain ticket capacity can differ. `/try` links to the ordinary event checkout and still requires World verification; it is not an identity bypass.
 
-| Command | What it does |
-|---|---|
-| `pnpm dev` | Next.js app |
-| `pnpm test` | All package tests |
-| `pnpm typecheck` | Typecheck everything |
-| `pnpm build` | Build all packages |
+World verification needs valid portal configuration and network access. `WORLD_ENVIRONMENT=staging` enables the simulator workflow. For a phone, localhost RPC addresses refer to the phone itself; supply a reachable RPC and app URL. Camera scanning needs a secure browser context.
 
-World ID: use staging + the [developer simulator](https://developer.world.org) while developing. Register action `houseful-login` on the app. Set `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, and `WORLD_ENVIRONMENT=staging` in `.env.local`.
+## Checks and demo path
 
-## Product rules (on chain)
+```sh
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm build
+E2E_WEB_PORT=3300 E2E_CHAIN_PORT=8550 E2E_WORLD_PORT=3399 pnpm --filter web e2e e2e/discovery
+```
 
-- No transfers: only `surrender` moves a ticket (resell at face value).
-- One nullifier per event (buy or waitlist).
-- Spent attestations cannot be replayed.
-- Proceeds and escrow are separate; hosts withdraw proceeds only after `endsAt`.
-- Refunds cannot be blocked by the host or the platform.
+The evidence table above records the local checks actually run. The commands also include broader checks that were not all run; they are not a claim of a clean full-repository typecheck, lint or live-service run. The [end-to-end guide](apps/web/e2e/README.md) explains the isolated local chain, database, server World stub and browser bridge stub. These tests do not establish that the live World service or a public RPC purchase works. Several flow specs contain fixture-gated skips. `recover.spec.ts` is gated on `E2E_RECOVER_READY` and expects an account recovery flow that does not yet exist; it is not evidence of recovery support.
 
-## AI use
+For a demo: open a show with a chain event id, choose a seat if asked, verify, and buy. Sign in as a fan to open `/tickets`, then sync `/door/[slug]` on a second screen before scanning. Choose “Resell at face value” before the cutoff and check the USDT refund and waitlist promotion. Both `/host` and `/host/new` require host wallet sign-in. Cancellation and withdrawal permissions remain enforced by the transaction wallet on chain; the host session and device transaction signer still need integration.
 
-This project was built with AI coding assistants (Cursor agents) for scaffolding, contract and app iteration, tests, and docs. Specs, prompts, and planning notes live under `docs/`. Humans directed product choices, reviewed diffs, and ran deployments and demos. AI assisted; it did not ship the project unsupervised.
+## AI use disclosure
+
+This table records the team's stated contributions. Founder details still need final confirmation before submission.
+
+| Contributor or tool | Contribution |
+| --- | --- |
+| Founder | Proposed World ID ticketing; set platform scope, design and commit rules; chose dollar prices, USDT settlement, Uniswap ETH payments and face-value hand-back; directed and tested work; handled accounts and keys. PENDING(founder-confirmation): correct and complete the personal contribution statement. |
+| Cursor agents | Wrote most contract and web app code through scaffolding and implementation iterations. |
+| Claude Code | Hackathon research, planning, unit tests, Playwright harness, documentation drafts, independent test and review runs, and the staging World simulator run. |
+| Codex | Search and filters, randomized contract invariant tests and review; subsequent documentation and catalog work. |
+
+Planning inputs are retained in [the v2 spec](docs/specs/v2.md) and [notes](docs/notes/). AI assistance does not establish independent review, a security audit or deployment readiness.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE).
