@@ -9,6 +9,7 @@ import type { DoorSync } from "@/app/api/door/[chainEventId]/sync/route";
 import { ArrowLeft, CameraIcon, CheckIcon, SyncIcon } from "@/components/icons";
 import { SplitFlap } from "@/components/motion/split-flap";
 import { formatLongDate, formatTime, shortHex } from "@/lib/format";
+import { playCue } from "@/lib/sounds";
 
 export type ScannerShow = {
   slug: string;
@@ -350,6 +351,7 @@ export function Scanner({ show }: { show: ScannerShow }) {
       writeStorage(keys.log, JSON.stringify(next));
 
       navigator.vibrate?.(result.ok ? 70 : [110, 70, 110]);
+      playCue(result.ok ? "admit" : "reject");
       pausedRef.current = true;
       const shown: Flash = {
         id: ++flashIdRef.current,

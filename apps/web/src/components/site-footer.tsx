@@ -20,6 +20,7 @@ export function SiteFooter() {
 
           <nav className="grid grid-cols-2 gap-x-10 gap-y-2 text-sm text-paper/80">
             <Link href="/how-it-works">How it works</Link>
+            <Link href="/try">Try at the booth</Link>
             <Link href="/host">Host a show</Link>
             <Link href="/tickets">Your tickets</Link>
             <Link href="/door">Door scanner</Link>

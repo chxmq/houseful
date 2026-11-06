@@ -8,6 +8,7 @@ import { deviceWallet, publicClient } from "@/lib/device-wallet";
 import { deviceDoorKey, doorKeyBytes32 } from "@/lib/door-key";
 import { formatUsdt, formatLongDate, formatTime, shortHex } from "@/lib/format";
 import { seatCaption } from "@/lib/seat-layout";
+import { playCue } from "@/lib/sounds";
 import {
   bindDoorKey,
   claimRefund,
@@ -198,6 +199,7 @@ function HeldTicket({
     setError(null);
     try {
       const res = await surrenderTicket(deviceSigner(), event.chainEventId, ticketId);
+      playCue("handback");
       setResult(
         res.to === "0x0000000000000000000000000000000000000000"
           ? `Refunded ${formatUsdt(event.priceUsd)}. Nobody was waiting, so the seat is back on sale.`

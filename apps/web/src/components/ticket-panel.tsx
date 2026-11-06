@@ -18,6 +18,7 @@ import {
   returnedSeat,
   type PayMethod,
 } from "@/lib/ticket-actions";
+import { playCue } from "@/lib/sounds";
 import { useEventChain } from "@/lib/use-event-chain";
 import { ArrowRight, CheckIcon, QueueIcon } from "./icons";
 import { SplitFlap } from "./motion/split-flap";
@@ -93,8 +94,10 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
     const signer = deviceSigner();
     setPhase({ name: "working", done: ["verify"], current: "pay" });
     try {
+      playCue("verify");
       if (mode === "join") {
         const res = await joinWaitlist(signer, chainId, faceValue, att, pay);
+        playCue("joined");
         setPhase({ name: "joined", position: res.position, hash: res.hash });
       } else {
         const chosen = seat ?? 0;
@@ -104,6 +107,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
           returned != null
             ? await claimReturnedSeat(signer, chainId, returned, faceValue, att, pay).finally(progress)
             : await buyTicket(signer, chainId, chosen, faceValue, att, pay).finally(progress);
+        playCue("bought");
         setPhase({
           name: "bought",
           ticketId: res.ticketId,
@@ -212,6 +216,11 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                         {mode === "join"
                           ? `You lock ${formatUsdt(event.priceUsd)} now. If a seat comes back, it is yours automatically. Leave any time for a full refund.`
                           : `World ID ${credential.label} keeps it to one ticket per person. We never see who you are.`}
+                      </p>
+                      <p className="mt-2 text-sm text-ink-soft">
+                        No World App on this phone? In the next step open the{" "}
+                        <span className="font-medium text-ink">simulator</span> and continue. You still get a real testnet
+                        ticket.
                       </p>
                     </>
                   ) : (
