@@ -21,6 +21,13 @@ const friendly: Record<string, string> = {
   EventIsCancelled: "This show was cancelled. You can claim a refund.",
   WrongPayment: "The amount sent did not match the face value.",
   NotTicketOwner: "This ticket is not held by this phone.",
+  InvalidSchedule: "The dates do not work: the hand-back cutoff must come after sales open and before the show ends.",
+  InvalidCapacity: "A show needs at least one seat.",
+  NotHost: "Only the wallet that listed this show can do that.",
+  EventEnded: "This show has already ended.",
+  EventNotEnded: "Proceeds unlock once the show has ended.",
+  ProceedsAlreadyWithdrawn: "Proceeds for this show were already withdrawn.",
+  NothingToRefund: "There is nothing to refund to this phone.",
 };
 
 export function explainError(err: unknown): string {
@@ -41,8 +48,18 @@ function requireContract() {
   return contractAddress;
 }
 
-async function send(
-  functionName: "buy" | "joinWaitlist" | "claimReturned" | "surrender" | "leaveWaitlist" | "setDoorKey",
+export async function send(
+  functionName:
+    | "buy"
+    | "joinWaitlist"
+    | "claimReturned"
+    | "surrender"
+    | "leaveWaitlist"
+    | "setDoorKey"
+    | "createEvent"
+    | "cancelEvent"
+    | "withdrawProceeds"
+    | "claimRefund",
   args: readonly unknown[],
   value = 0n,
 ) {
