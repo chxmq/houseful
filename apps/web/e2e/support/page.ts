@@ -2,8 +2,11 @@ import { expect, type Page } from "@playwright/test";
 import type { Address, Hex } from "viem";
 import { privateKeyToAddress } from "viem/accounts";
 
-/** Fails when the page scrolls sideways. The message names the elements that reach furthest, the usual culprits. */
-export async function expectNoHorizontalScroll(page: Page) {
+/**
+ * Fails when the page scrolls sideways. The message names the elements that reach furthest, the usual culprits.
+ * With `soft` the test is marked failed but goes on, for a spec that has more to check after this.
+ */
+export async function expectNoHorizontalScroll(page: Page, options: { soft?: boolean } = {}) {
   const measured = await page.evaluate(() => {
     const clientWidth = document.documentElement.clientWidth;
     const wide = [...document.body.querySelectorAll("*")]
@@ -17,7 +20,8 @@ export async function expectNoHorizontalScroll(page: Page) {
       });
     return { scrollWidth: document.documentElement.scrollWidth, clientWidth, wide };
   });
-  expect(
+  const check = options.soft ? expect.soft : expect;
+  check(
     measured.scrollWidth,
     `The page scrolls sideways: ${measured.scrollWidth}px of content in a ${measured.clientWidth}px window. Widest: ${measured.wide.join("; ") || "none found"}`,
   ).toBeLessThanOrEqual(measured.clientWidth);

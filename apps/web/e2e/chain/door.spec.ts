@@ -31,7 +31,8 @@ test("the ticket shows its seat and a rotating code, and the door admits it once
   await openTickets(page);
   await expect(page.getByText("Seat 4", { exact: true })).toBeVisible();
   await expect(page.getByText(/^New code in \d+s$/)).toBeVisible();
-  await expectNoHorizontalScroll(page);
+  // Soft, so the door still gets checked: signed in, the header's account menu is wider than a 375px phone.
+  await expectNoHorizontalScroll(page, { soft: true });
   const code = await copyDoorCode(page);
   expect(code).toMatch(new RegExp(`^[A-Za-z0-9_-]{${DOOR_PAYLOAD_LENGTH}}$`));
 
