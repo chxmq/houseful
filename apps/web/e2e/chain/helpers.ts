@@ -55,9 +55,9 @@ export async function openTickets(page: Page) {
   await expect(page.getByText("Reading your tickets from the contract")).toBeHidden({ timeout: 30_000 });
 }
 
-/** Hands the ticket back from the wallet page. The seat goes to the next person in line, or back on sale. */
+/** Hands the ticket back from the wallet page, which calls it "Resell at face value". The seat goes to the next person in line, or back on sale. */
 export async function handBack(page: Page) {
-  await page.getByRole("button", { name: "Cannot make it? Hand it back" }).click();
-  await page.getByRole("button", { name: /^Hand back for \$\d+$/ }).click();
+  await page.getByRole("button", { name: "Cannot make it? Resell at face value" }).click();
+  await page.getByRole("button", { name: /^Resell for \$\d+$/ }).click();
   await expect(page.getByText(/^Refunded \$\d+\./)).toBeVisible({ timeout: 60_000 });
 }

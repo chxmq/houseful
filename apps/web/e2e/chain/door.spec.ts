@@ -68,5 +68,6 @@ test("the ticket shows its seat and a rotating code, and the door admits it once
   // which is the same as the code being that old.
   await door.page.clock.setFixedTime(new Date(Date.now() + 90_000));
   await scan(door.page, code);
-  await expect(answer(door.page)).toContainText("Code expired: this looks like a screenshot");
+  await expect(answer(door.page)).toContainText("Code expired");
+  await expect(answer(door.page)).toContainText("Codes change every 20 seconds");
 });

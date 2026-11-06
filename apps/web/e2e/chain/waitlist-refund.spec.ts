@@ -120,8 +120,8 @@ test.describe("waitlist and USDT refund", () => {
     const before = await chain.usdtBalanceOf(holderWallet);
 
     await openTickets(holder.page);
-    await holder.page.getByRole("button", { name: "Cannot make it? Hand it back" }).click();
-    await holder.page.getByRole("button", { name: /^Hand back for \$\d+$/ }).click();
+    await holder.page.getByRole("button", { name: "Cannot make it? Resell at face value" }).click();
+    await holder.page.getByRole("button", { name: /^Resell for \$\d+$/ }).click();
 
     // The hand-back itself works: nobody was waiting, so the seat is back on sale and the face value is back in USDT.
     await expect.poll(() => chain.usdtBalanceOf(holderWallet)).toBe(before + show.price);
