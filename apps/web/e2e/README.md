@@ -81,6 +81,7 @@ Both stubs together follow the whole path: the browser proves, the server checks
 | Variable | Effect |
 |---|---|
 | `E2E_REUSE=1` or `0` | Use or refuse a stack that is already running. Default: reuse, unless `CI` is set. |
+| `E2E_WEB_PORT`, `E2E_CHAIN_PORT`, `E2E_WORLD_PORT` | Ports of the stack (3200, 8547, 3299 by default). Set the same values for the stack and for the run to keep a second stack beside one that is already running, for instance from another clone of the repo. |
 | `E2E_WORKERS=n` | Tests run one at a time by default, because they share one chain, one database and one funding account. Four workers passed four runs in a row and halve the time, but a spec that changes a shared show (a sold out show, a waitlist) must run alone. |
 | `E2E_HTML=1` | Also write an HTML report to `playwright-report/`. Off by default. |
 
