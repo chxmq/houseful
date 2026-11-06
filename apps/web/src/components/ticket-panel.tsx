@@ -20,8 +20,9 @@ import {
 } from "@/lib/ticket-actions";
 import { playCue } from "@/lib/sounds";
 import { useEventChain } from "@/lib/use-event-chain";
-import { ArrowRight, CheckIcon, QueueIcon } from "./icons";
+import { ArrowRight, QueueIcon } from "./icons";
 import { SplitFlap } from "./motion/split-flap";
+import { TicketMinting } from "./motion/ticket-minting";
 import { TicketPrint } from "./motion/ticket-print";
 import { SeatMap } from "./seatmap/seat-map";
 import { TicketStub } from "./ticket-stub";
@@ -49,12 +50,6 @@ type Phase =
   | { name: "bought"; ticketId: number; seat: number; hash: string }
   | { name: "joined"; position: number; hash: string }
   | { name: "failed"; failure: VerifyFailure | { kind: "chain"; message: string } };
-
-const stepLabel: Record<Step, string> = {
-  verify: "Checked you are one person",
-  pay: "Paid the face value",
-  bind: "Bound this phone to the ticket for the door",
-};
 
 export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   const { state, error, refresh } = useEventChain(event.chainEventId);
@@ -234,20 +229,15 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
           ) : null}
 
           {phase.name === "working" ? (
-            <motion.ol key="working" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-              {(["verify", "pay", "bind"] as Step[]).map((s) => {
-                const done = phase.done.includes(s);
-                const active = phase.current === s;
-                return (
-                  <li key={s} className={`flex items-center gap-3 ${done || active ? "text-ink" : "text-muted"}`}>
-                    <span className={`grid size-7 place-items-center rounded-full ${done ? "bg-admit text-paper" : "border border-ink/25"}`}>
-                      {done ? <CheckIcon size={16} /> : active ? <Spinner /> : null}
-                    </span>
-                    {stepLabel[s]}
-                  </li>
-                );
-              })}
-            </motion.ol>
+            <motion.div key="working" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+              <TicketMinting
+                done={phase.done}
+                current={phase.current}
+                title={event.title}
+                priceLabel={formatUsdt(event.priceUsd)}
+                seatLabel={seat != null ? seatCaption(seat) : undefined}
+              />
+            </motion.div>
           ) : null}
 
           {phase.name === "bought" ? (
@@ -370,12 +360,3 @@ function TxLink({ hash }: { hash: string }) {
   );
 }
 
-function Spinner() {
-  return (
-    <motion.span
-      className="block size-3.5 rounded-full border-2 border-ink/20 border-t-ink"
-      animate={{ rotate: 360 }}
-      transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
-    />
-  );
-}

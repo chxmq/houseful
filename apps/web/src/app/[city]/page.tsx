@@ -60,7 +60,7 @@ async function CityContent({ params }: Pick<PageProps<"/[city]">, "params">) {
     <>
       <SiteHeader city={city} />
 
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <section className="mx-auto max-w-[1320px] px-5 pb-10 pt-12 md:px-8 md:pt-20">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted">
             {city.name} · {upcoming.length} shows · {houseful.length} sold out with a waitlist

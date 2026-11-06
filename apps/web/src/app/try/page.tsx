@@ -28,7 +28,7 @@ export default async function TryPage() {
   return (
     <>
       <SiteHeader city={event?.citySlug === "mumbai" ? { slug: "mumbai", name: "Mumbai" } : undefined} />
-      <main className="mx-auto flex w-full max-w-[720px] flex-1 flex-col px-5 pb-20 pt-10 md:px-8">
+      <main id="main" className="mx-auto flex w-full max-w-[720px] flex-1 flex-col px-5 pb-20 pt-10 md:px-8">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">ETHGlobal booth</p>
         <h1 className="mt-3 font-display text-[clamp(2.75rem,8vw,5rem)] font-black uppercase leading-[0.85]">
           Try a real ticket

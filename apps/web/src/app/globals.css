@@ -32,6 +32,17 @@
   body {
     font-family: var(--font-sans);
     font-feature-settings: "ss01", "tnum";
+    min-height: 100dvh;
+  }
+
+  a {
+    text-underline-offset: 0.18em;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
   }
 
   ::selection {

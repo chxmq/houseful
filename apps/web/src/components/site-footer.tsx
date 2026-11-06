@@ -31,9 +31,14 @@ export function SiteFooter() {
           </nav>
         </div>
 
-        <p className="mt-10 font-mono text-[11px] uppercase tracking-[0.18em] text-paper/40">
-          Built at ETHGlobal Mumbai, November 2026. Testnet only.
-        </p>
+        <div className="mt-10 flex flex-col gap-3 border-t border-paper/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-paper/40">
+            Built at ETHGlobal Mumbai · November 2026
+          </p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-paper/40">
+            Unichain Sepolia · test USDT · not affiliated with listed artists
+          </p>
+        </div>
       </div>
     </footer>
   );

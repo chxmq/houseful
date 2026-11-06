@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TicketIcon } from "./icons";
+import { NetworkChip } from "./network-chip";
 
 type SiteHeaderProps = {
   city?: { slug: string; name: string };
@@ -21,8 +22,14 @@ export function SiteHeader({ city }: SiteHeaderProps) {
   const base = city ? `/${city.slug}` : "/mumbai";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper">
-      <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-6 px-5 md:px-8">
+    <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur-md">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-sm focus:text-paper"
+      >
+        Skip to content
+      </a>
+      <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-4 px-5 md:gap-6 md:px-8">
         <Link href={base} aria-label="Houseful home">
           <Wordmark />
         </Link>
@@ -39,24 +46,27 @@ export function SiteHeader({ city }: SiteHeaderProps) {
           </Link>
         ) : null}
 
-        <nav className="ml-auto flex items-center gap-1 text-sm font-medium">
-          <Link href={base} className="hidden px-3 py-2 sm:block">
-            What&apos;s on
-          </Link>
-          <Link href="/how-it-works" className="hidden px-3 py-2 lg:block">
-            How it works
-          </Link>
-          <Link href="/host" className="hidden px-3 py-2 sm:block">
-            For hosts
-          </Link>
-          <Link
-            href="/tickets"
-            className="ml-2 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-paper"
-          >
-            <TicketIcon size={16} />
-            <span className="sr-only sm:not-sr-only">Your tickets</span>
-          </Link>
-        </nav>
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <NetworkChip />
+          <nav className="flex items-center gap-1 text-sm font-medium">
+            <Link href={base} className="hidden px-3 py-2 sm:block">
+              What&apos;s on
+            </Link>
+            <Link href="/how-it-works" className="hidden px-3 py-2 lg:block">
+              How it works
+            </Link>
+            <Link href="/host" className="hidden px-3 py-2 sm:block">
+              For hosts
+            </Link>
+            <Link
+              href="/tickets"
+              className="ml-1 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-paper transition-opacity hover:opacity-90"
+            >
+              <TicketIcon size={16} />
+              <span className="sr-only sm:not-sr-only">Your tickets</span>
+            </Link>
+          </nav>
+        </div>
       </div>
     </header>
   );

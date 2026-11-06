@@ -37,7 +37,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
     <>
       <SiteHeader city={{ slug: e.citySlug, name: e.city?.name ?? e.citySlug }} />
 
-      <main className="mx-auto grid w-full max-w-[1320px] flex-1 gap-10 px-5 pb-24 pt-8 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-16 md:px-8 md:pt-12">
+      <main id="main" className="mx-auto grid w-full max-w-[1320px] flex-1 gap-10 px-5 pb-24 pt-8 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-16 md:px-8 md:pt-12">
         <div className="md:sticky md:top-24 md:self-start">
           <EventPoster
             title={e.title}
