@@ -84,7 +84,7 @@ function PosterArt({ variant, seed, accent, fg }: { variant: number; seed: numbe
       return (
         <svg className="absolute inset-0 size-full" viewBox="0 0 400 500" preserveAspectRatio="none" aria-hidden="true">
           <circle cx={240 + (r(1) % 80)} cy={150 + (r(3) % 60)} r="150" fill={accent} />
-          <rect x="0" y="330" width="400" height="12" fill={fg} />
+          <rect x="0" y="92" width="400" height="8" fill={fg} />
         </svg>
       );
     case 1:

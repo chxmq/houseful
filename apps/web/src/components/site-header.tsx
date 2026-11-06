@@ -51,10 +51,10 @@ export function SiteHeader({ city }: SiteHeaderProps) {
           </Link>
           <Link
             href="/tickets"
-            className="ml-2 inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-paper"
+            className="ml-2 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-paper"
           >
             <TicketIcon size={16} />
-            Your tickets
+            <span className="sr-only sm:not-sr-only">Your tickets</span>
           </Link>
         </nav>
       </div>
