@@ -17,4 +17,11 @@ export const SHOWS = {
     chainEventId: 1,
     price: /₹\s?1,?499\b/,
   },
+  /** Sold out, with four people waiting ahead (the seed lets five join and one leave). Join it and leave again, never rely on its place in line. */
+  soldOut: {
+    slug: "chawl-no-9-prithvi",
+    title: "Chawl No. 9",
+    chainEventId: 7,
+    priceUsd: 6,
+  },
 } as const;
