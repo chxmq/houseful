@@ -8,7 +8,7 @@ import {
   type IDKitResult,
   type RpContext,
 } from "@worldcoin/idkit";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Assurance } from "@/lib/assurance";
 import { PersonCheckIcon } from "./icons";
 
@@ -67,6 +67,7 @@ export function VerifyHuman({ eventId, wallet, purpose, assurance, label, onVeri
   const [request, setRequest] = useState<WorldRequest | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const settled = useRef(false);
 
   async function start() {
     setBusy(true);
@@ -79,6 +80,7 @@ export function VerifyHuman({ eventId, wallet, purpose, assurance, label, onVeri
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setRequest(data);
+      settled.current = false;
       setOpen(true);
     } catch (err) {
       onFailed({ kind: "unavailable", message: (err as Error).message || "World ID is not reachable right now." });
@@ -88,6 +90,7 @@ export function VerifyHuman({ eventId, wallet, purpose, assurance, label, onVeri
   }
 
   async function verifyOnServer(result: IDKitResult) {
+    settled.current = true;
     const res = await fetch("/api/world/verify", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -122,7 +125,16 @@ export function VerifyHuman({ eventId, wallet, purpose, assurance, label, onVeri
       {request ? (
         <IDKitRequestWidget
           open={open}
-          onOpenChange={setOpen}
+          onOpenChange={(next) => {
+            setOpen(next);
+            if (next) return;
+            // Closing the modal, or declining in World App, does not always reach onError.
+            setTimeout(() => {
+              if (settled.current) return;
+              settled.current = true;
+              onFailed({ kind: "cancelled", message: "Verification was cancelled. Nothing was charged." });
+            }, 300);
+          }}
           app_id={request.appId}
           action={request.action}
           rp_context={request.rpContext}
@@ -131,7 +143,10 @@ export function VerifyHuman({ eventId, wallet, purpose, assurance, label, onVeri
           preset={preset}
           handleVerify={verifyOnServer}
           onSuccess={() => setOpen(false)}
-          onError={(code) => onFailed(failureFromIdkit(code))}
+          onError={(code) => {
+            settled.current = true;
+            onFailed(failureFromIdkit(code));
+          }}
         />
       ) : null}
     </>
