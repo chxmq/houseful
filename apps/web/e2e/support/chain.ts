@@ -1,13 +1,16 @@
-import { housefulAbi } from "@houseful/contracts";
+import { housefulAbi, usdtAbi } from "@houseful/contracts";
 import { expect, type Page } from "@playwright/test";
 import {
   createPublicClient,
+  createTestClient,
   createWalletClient,
+  decodeFunctionData,
   http,
   isAddress,
   parseEther,
   type Address,
   type GetContractEventsReturnType,
+  type Hex,
 } from "viem";
 import { privateKeyToAddress } from "viem/accounts";
 import { hardhat } from "viem/chains";
@@ -28,9 +31,10 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * the page has not caught up.
  */
 export function createChain(rpcUrl: string = URLS.rpc) {
-  const contract = readDeployment().address;
+  const { address: contract, usdt } = readDeployment();
   const transport = http(rpcUrl);
   const publicClient = createPublicClient({ chain: hardhat, transport });
+  const testClient = createTestClient({ chain: hardhat, mode: "hardhat", transport });
 
   // Hardhat keeps its development accounts unlocked and numbers their transactions itself. Asking it to send
   // (instead of signing here) means a test can fund a wallet at the same moment the app's faucet is paying one.
@@ -44,6 +48,11 @@ export function createChain(rpcUrl: string = URLS.rpc) {
 
   async function balanceOf(address: Address): Promise<bigint> {
     return publicClient.getBalance({ address });
+  }
+
+  /** Test USDT (6 decimals, so $8 is 8_000_000n) held by a wallet. */
+  async function usdtBalanceOf(address: Address): Promise<bigint> {
+    return publicClient.readContract({ address: usdt, abi: usdtAbi, functionName: "balanceOf", args: [address] });
   }
 
   /** Sends test ETH from Hardhat account 0 and returns once the new balance is visible. */
@@ -91,6 +100,16 @@ export function createChain(rpcUrl: string = URLS.rpc) {
       });
       return waiting ? Number(position) : null;
     },
+    /** What the contract holds for the show: `proceeds` backs held seats, `escrow` backs waitlist places. USDT units. */
+    ledger: async (chainEventId: number) => {
+      const [proceeds, escrow] = await publicClient.readContract({
+        address: contract,
+        abi: housefulAbi,
+        functionName: "ledger",
+        args: [BigInt(chainEventId)],
+      });
+      return { proceeds, escrow };
+    },
     /** Whether this person (a nullifier in any spelling) already holds a ticket or a waitlist place for the show. */
     nullifierUsed: (chainEventId: number, person: string | bigint) =>
       publicClient.readContract({
@@ -100,6 +119,28 @@ export function createChain(rpcUrl: string = URLS.rpc) {
         args: [BigInt(chainEventId), nullifierToBigint(person)],
       }),
   };
+
+  /** Which Houseful function a transaction called, such as `buy` or `buyWithEth`, and how much ETH it sent along. */
+  async function callOf(hash: Hex): Promise<{ functionName: string; ethSent: bigint }> {
+    const { input, value } = await publicClient.getTransaction({ hash });
+    return { functionName: decodeFunctionData({ abi: housefulAbi, data: input }).functionName, ethSent: value };
+  }
+
+  /**
+   * Runs `run` with the chain clock moved to `timestamp` (unix seconds), then puts the chain back as it was.
+   * The app gives its attestations 15 minutes on the real clock, so a chain left in the future would refuse
+   * every purchase after this. Nothing else may use the chain meanwhile, so a spec that calls this runs alone.
+   */
+  async function atTime(timestamp: bigint | number, run: () => Promise<void>) {
+    const snapshot = await testClient.snapshot();
+    try {
+      await testClient.setNextBlockTimestamp({ timestamp: BigInt(timestamp) });
+      await testClient.mine({ blocks: 1 });
+      await run();
+    } finally {
+      await testClient.revert({ id: snapshot });
+    }
+  }
 
   /** Take this before acting, then pass it to waitForEvent so only what follows counts. */
   const blockNumber = () => publicClient.getBlockNumber();
@@ -155,9 +196,12 @@ export function createChain(rpcUrl: string = URLS.rpc) {
     contract,
     publicClient,
     balanceOf,
+    usdtBalanceOf,
     fund,
     read,
     blockNumber,
+    callOf,
+    atTime,
     waitForEvent,
     untilShown,
   };

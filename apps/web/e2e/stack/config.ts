@@ -50,6 +50,7 @@ export const BUILD_DIR_RELATIVE = path.relative(WEB_DIR, BUILD_DIR);
 export type Deployment = {
   address: `0x${string}`;
   verifier: `0x${string}`;
+  usdt: `0x${string}`;
   blockNumber: number;
   [field: string]: unknown;
 };

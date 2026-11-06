@@ -70,7 +70,7 @@ Both stubs together follow the whole path: the browser proves, the server checks
 
 ## Helpers
 
-- `support/chain.ts`, the `chain` fixture. `fund(address)` sends test ETH from Hardhat account 0. `read.*` reads the Houseful contract with viem. `blockNumber()` and `waitForEvent()` wait for what the app does on chain. `untilShown(page, event, shows)` waits for the event, then for the page to show it, retrying and optionally reloading, and says which half failed.
+- `support/chain.ts`, the `chain` fixture. `fund(address)` sends test ETH from Hardhat account 0. `read.*` reads the Houseful contract with viem. `usdtBalanceOf(address)` reads a wallet's test USDT, and `callOf(hash)` says which function a transaction called and how much ETH it sent. `atTime(timestamp, run)` moves the chain clock for the callback and puts the chain back afterwards, so a spec that uses it must run alone. `blockNumber()` and `waitForEvent()` wait for what the app does on chain. `untilShown(page, event, shows)` waits for the event, then for the page to show it, retrying and optionally reloading, and says which half failed.
 - `support/fixtures.ts`. `world`, `worldVerify`, `wallet`, `device`, `chain`. Each test gets a fresh browser context, so a fresh built-in wallet.
 - `support/page.ts`. `expectNoHorizontalScroll(page)` and the built-in wallet's address.
 - `support/catalog.ts`. The seeded shows the specs use. Update it when the seed changes.
