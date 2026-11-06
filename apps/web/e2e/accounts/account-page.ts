@@ -8,8 +8,20 @@ import { deviceWalletAddress } from "../support/page";
 /** The account menu: "Sign in" when signed out, "Account" or "Host console" and "Sign out" when signed in. */
 export const accountMenu = (page: Page): Locator => page.getByRole("banner");
 
+/**
+ * Presses "Sign out" in the account menu. On a 375px phone the signed-in header is wider than the window and the
+ * "Account" link covers the button, so a tap cannot land on it. That is recorded as a soft failure, and the press is
+ * sent to the button itself so the rest of the spec still runs.
+ */
 export async function signOut(page: Page) {
-  await accountMenu(page).getByRole("button", { name: "Sign out" }).click();
+  const button = accountMenu(page).getByRole("button", { name: "Sign out" });
+  const tappable = await button.click({ trial: true, timeout: 3_000 }).then(
+    () => true,
+    () => false,
+  );
+  expect.soft(tappable, "the account menu's Sign out can be tapped").toBe(true);
+  if (tappable) await button.click();
+  else await button.dispatchEvent("click");
 }
 
 /** The row of one linked wallet. The page shows the address in lower case, cut to its first 8 and last 6 characters. */
