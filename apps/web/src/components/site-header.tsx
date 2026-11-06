@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { TicketIcon } from "./icons";
-import { NetworkChip } from "./network-chip";
 
 type SiteHeaderProps = {
   city?: { slug: string; name: string };
@@ -46,27 +45,21 @@ export function SiteHeader({ city }: SiteHeaderProps) {
           </Link>
         ) : null}
 
-        <div className="ml-auto flex items-center gap-2 sm:gap-3">
-          <NetworkChip />
-          <nav className="flex items-center gap-1 text-sm font-medium">
-            <Link href={base} className="hidden px-3 py-2 sm:block">
-              What&apos;s on
-            </Link>
-            <Link href="/how-it-works" className="hidden px-3 py-2 lg:block">
-              How it works
-            </Link>
-            <Link href="/host" className="hidden px-3 py-2 sm:block">
-              For hosts
-            </Link>
-            <Link
-              href="/tickets"
-              className="ml-1 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-paper transition-opacity hover:opacity-90"
-            >
-              <TicketIcon size={16} />
-              <span className="sr-only sm:not-sr-only">Your tickets</span>
-            </Link>
-          </nav>
-        </div>
+        <nav className="ml-auto flex items-center gap-1 text-sm font-medium">
+          <Link href={base} className="hidden px-3 py-2 sm:block">
+            What&apos;s on
+          </Link>
+          <Link href="/how-it-works" className="hidden px-3 py-2 lg:block">
+            How it works
+          </Link>
+          <Link
+            href="/tickets"
+            className="ml-1 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-paper transition-opacity hover:opacity-90"
+          >
+            <TicketIcon size={16} />
+            <span className="sr-only sm:not-sr-only">Your tickets</span>
+          </Link>
+        </nav>
       </div>
     </header>
   );
