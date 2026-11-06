@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["@houseful/contracts", "@houseful/pass"],
+  async redirects() {
+    return [{ source: "/", destination: "/mumbai", permanent: false }];
+  },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

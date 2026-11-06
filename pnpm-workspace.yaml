@@ -7,3 +7,5 @@ allowBuilds:
   esbuild: true
   keccak: false
   secp256k1: false
+verifyDepsBeforeRun: false
+confirmModulesPurge: false
