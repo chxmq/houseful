@@ -221,23 +221,62 @@ describe("seeded lifecycle invariants", function () {
 });
 
 describe("contract review fixes", () => {
-  it("HF-01: a returned seat stays reserved and must be claimed on the original ticket", async () => {
-    const f = await fixture();
-    await f.buy(f.fans[0], 1, 1, 1n);
-    await f.c.connect(f.fans[0]).surrender(1, 0);
-    expect(await f.c.seatsTaken(1, 1, 1)).to.deep.equal([true]);
-    await expect(f.buy(f.fans[1], 1, 1, 2n)).to.be.revertedWithCustomError(f.c, "SeatTaken").withArgs(1);
-    await f.buy(f.fans[1], 1, 2, 2n);
-    const a = await f.signed(f.fans[2], 1, 3n, Purpose.Claim);
-    await f.c.connect(f.fans[2]).claimReturned(1, 0, 3, a.deadline, a.sig);
-    const original = await f.c.getTicket(1, 0);
-    const other = await f.c.getTicket(1, 1);
-    expect(original.owner).to.equal(f.fans[2].address);
-    expect(original.seat).to.equal(1n);
-    expect(other.owner).to.equal(f.fans[1].address);
-    expect(other.seat).to.equal(2n);
-    await invariant(f);
-  });
+  for (const buyEth of [false, true]) for (const claimEth of [false, true]) {
+    it(`HF-01: reserves returned seats with ${buyEth ? "ETH" : "USDT"} buys and ${claimEth ? "ETH" : "USDT"} claims`, async () => {
+      const f = await fixture();
+      await f.buy(f.fans[0], 1, 1, 1n, buyEth);
+      await f.c.connect(f.fans[0]).surrender(1, 0);
+      expect(await f.c.seatsTaken(1, 1, 1)).to.deep.equal([true]);
+      const beforeBalance = await f.token.balanceOf(await f.c.getAddress());
+      const beforeRouterBalance = await ethers.provider.getBalance(await f.router.getAddress());
+      await expect(f.buy(f.fans[1], 1, 1, 2n, buyEth)).to.be.revertedWithCustomError(f.c, "SeatTaken").withArgs(1);
+      expect(await f.token.balanceOf(await f.c.getAddress())).to.equal(beforeBalance);
+      expect(await ethers.provider.getBalance(await f.router.getAddress())).to.equal(beforeRouterBalance);
+      expect(await f.c.nullifierUsed(1, 2)).to.equal(false);
+      await invariant(f);
+      await f.buy(f.fans[1], 1, 2, 2n, buyEth);
+      const a = await f.signed(f.fans[2], 1, 3n, Purpose.Claim);
+      if (claimEth) await f.c.connect(f.fans[2]).claimReturnedWithEth(1, 0, 3, a.deadline, a.sig, { value: ethers.parseEther("0.01") });
+      else await f.c.connect(f.fans[2]).claimReturned(1, 0, 3, a.deadline, a.sig);
+      const original = await f.c.getTicket(1, 0);
+      const other = await f.c.getTicket(1, 1);
+      expect(original.owner).to.equal(f.fans[2].address);
+      expect(original.seat).to.equal(1n);
+      expect(other.owner).to.equal(f.fans[1].address);
+      expect(other.seat).to.equal(2n);
+      expect(await f.c.returnedTickets(1)).to.deep.equal([]);
+      await invariant(f);
+    });
+  }
+
+  for (const eth of [false, true]) {
+    it(`rolls back a failed ${eth ? "ETH" : "USDT"} returned claim and accepts the same attestation on retry`, async () => {
+      const f = await fixture();
+      await f.buy(f.fans[0], 1, 3, 1n);
+      await f.c.connect(f.fans[0]).surrender(1, 0);
+      const before = await f.c.getTicket(1, 0);
+      const a = await f.signed(f.fans[1], 1, 2n, Purpose.Claim);
+      if (eth) {
+        await expect(f.c.connect(f.fans[1]).claimReturnedWithEth(1, 0, 2, a.deadline, a.sig, { value: 1n })).to.be.reverted;
+      } else {
+        await f.token.connect(f.fans[1]).approve(await f.c.getAddress(), 0);
+        await expect(f.c.connect(f.fans[1]).claimReturned(1, 0, 2, a.deadline, a.sig)).to.be.reverted;
+      }
+      expect(await f.c.getTicket(1, 0)).to.deep.equal(before);
+      expect(await f.c.returnedTickets(1)).to.deep.equal([0n]);
+      expect(await f.c.nullifierUsed(1, 2)).to.equal(false);
+      expect(await f.c.ticketOf(1, f.fans[1].address)).to.deep.equal([false, 0n]);
+      await invariant(f);
+      if (eth) await f.c.connect(f.fans[1]).claimReturnedWithEth(1, 0, 2, a.deadline, a.sig, { value: ethers.parseEther("0.01") });
+      else {
+        await f.token.connect(f.fans[1]).approve(await f.c.getAddress(), FACE);
+        await f.c.connect(f.fans[1]).claimReturned(1, 0, 2, a.deadline, a.sig);
+      }
+      expect((await f.c.getTicket(1, 0)).seat).to.equal(3n);
+      expect((await f.c.getTicket(1, 0)).owner).to.equal(f.fans[1].address);
+      await invariant(f);
+    });
+  }
 
   it("blocks token reentry and rolls a failed payout back so it can be retried", async () => {
     const f = await fixture("HostileToken");
