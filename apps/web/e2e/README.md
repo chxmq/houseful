@@ -75,9 +75,9 @@ Both stubs together follow the whole path: the browser proves, the server checks
 | Variable | Effect |
 |---|---|
 | `E2E_REUSE=1` or `0` | Use or refuse a stack that is already running. Default: reuse, unless `CI` is set. |
-| `E2E_WORKERS=n` | Tests run one at a time by default, because they share one chain and one funding account. |
+| `E2E_WORKERS=n` | Tests run one at a time by default, because they share one chain, one database and one funding account. Four workers passed four runs in a row and halve the time, but a spec that changes a shared show (a sold out show, a waitlist) must run alone. |
 | `E2E_HTML=1` | Also write an HTML report to `playwright-report/`. Off by default. |
 
 Failures keep a trace and a screenshot in `apps/web/test-results/`. Open a trace with `pnpm --filter web exec playwright show-trace <trace.zip>`. Motion is reduced, the clock zone is UTC and the locale is en-IN in every run, so a run looks the same on any machine. A spec about a city's own time zone sets its own with `test.use({ timezoneId })`.
 
-`next build` fetches Google Fonts. A dropped connection there is retried twice before the run fails.
+`next build` fetches Google Fonts. A dropped connection there is retried twice before the run fails. The stack code stops processes by group and checks them with `ps`, so it runs on macOS and Linux.
