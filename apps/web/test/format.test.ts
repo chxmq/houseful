@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CATEGORIES } from "../src/lib/event-draft";
 import {
   categoryLabel,
+  formatClock,
   formatDayMonth,
   formatDayNum,
   formatEth,
@@ -184,5 +185,36 @@ describe("categoryLabel", () => {
 
   it("has exactly the keys of CATEGORIES", () => {
     expect(Object.keys(categoryLabel).sort()).toEqual([...CATEGORIES].sort());
+  });
+});
+
+describe("event city timezones", () => {
+  it.each([
+    ["2026-11-07T20:00:00Z", "Europe/London", "8:00pm", "Sat", "7 Nov", "Saturday, 7 November", "07", "NOV"],
+    ["2026-07-07T19:00:00Z", "Europe/London", "8:00pm", "Tue", "7 Jul", "Tuesday, 7 July", "07", "JUL"],
+    ["2027-01-01T01:00:00Z", "America/New_York", "8:00pm", "Thu", "31 Dec", "Thursday, 31 December", "31", "DEC"],
+  ])("formats %s in %s", (iso, timezone, time, weekday, date, longDate, day, month) => {
+    const at = Date.parse(iso) / 1000;
+    expect(formatTime(at, timezone)).toBe(time);
+    expect(formatWeekday(at, timezone)).toBe(weekday);
+    expect(formatDayMonth(at, timezone)).toBe(date);
+    expect(formatLongDate(at, timezone)).toBe(longDate);
+    expect(formatDayNum(at, timezone)).toBe(day);
+    expect(formatMonShort(at, timezone)).toBe(month);
+  });
+
+  it("formats door clocks in the show's timezone", () => {
+    const at = Date.parse("2026-11-07T20:00:15Z") / 1000;
+    expect(formatClock(at, "Europe/London")).toBe("20:00:15");
+    expect(formatClock(at, "Asia/Kolkata")).toBe("01:30:15");
+  });
+
+  it("does not reuse another city's formatter when alternating cities", () => {
+    const at = Date.parse("2026-11-07T20:00:00Z") / 1000;
+    expect(formatTime(at, "Europe/London")).toBe("8:00pm");
+    expect(formatTime(at, "Asia/Kolkata")).toBe("1:30am");
+    expect(formatDayMonth(at, "Asia/Kolkata")).toBe("8 Nov");
+    expect(formatTime(at, "Europe/London")).toBe("8:00pm");
+    expect(formatDayMonth(at, "Europe/London")).toBe("7 Nov");
   });
 });

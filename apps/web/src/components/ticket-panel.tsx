@@ -39,6 +39,7 @@ export type TicketPanelEvent = {
   sold: number;
   status: string;
   startsAt: number;
+  timezone: string;
   venue: string;
   assurance: Assurance;
 };
@@ -249,7 +250,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
             <motion.div key="bought" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <TicketPrint>
                 <TicketStub
-                  eyebrow={`Admit one · ${formatLongDate(event.startsAt)}`}
+                  eyebrow={`Admit one · ${formatLongDate(event.startsAt, event.timezone)}`}
                   title={event.title}
                   lines={[
                     { label: "Venue", value: event.venue },

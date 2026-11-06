@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { DoorSync } from "@/app/api/door/[chainEventId]/sync/route";
 import { ArrowLeft, CameraIcon, CheckIcon, SyncIcon } from "@/components/icons";
 import { SplitFlap } from "@/components/motion/split-flap";
-import { formatLongDate, formatTime, shortHex } from "@/lib/format";
+import { formatClock, formatLongDate, formatTime, shortHex } from "@/lib/format";
 import { playCue } from "@/lib/sounds";
 
 export type ScannerShow = {
@@ -17,6 +17,7 @@ export type ScannerShow = {
   title: string;
   venue: string;
   startsAt: number;
+  timezone: string;
   doorsAt: number;
 };
 
@@ -193,15 +194,6 @@ function ticketFromPayload(payload: string): number | null {
 }
 
 const ticketNo = (ticket: number) => `No. ${String(ticket + 1).padStart(4, "0")}`;
-
-const clockFormat = new Intl.DateTimeFormat("en-IN", {
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-  timeZone: "Asia/Kolkata",
-});
-const formatClock = (seconds: number) => clockFormat.format(new Date(seconds * 1000));
 
 function formatAge(seconds: number) {
   if (seconds < 60) return "just now";
@@ -408,7 +400,7 @@ export function Scanner({ show }: { show: ScannerShow }) {
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-xl font-extrabold uppercase leading-none">{show.title}</p>
             <p className="mt-0.5 truncate font-mono text-[10px] uppercase tracking-[0.14em] text-paper/55">
-              {show.venue} · Doors {formatTime(show.doorsAt)}
+              {show.venue} · Doors {formatTime(show.doorsAt, show.timezone)}
             </p>
           </div>
           <NetworkBadge online={!hydrated || online} />
@@ -425,7 +417,7 @@ export function Scanner({ show }: { show: ScannerShow }) {
             >
               <span className="mx-auto block max-w-5xl px-4 py-2 text-sm font-medium md:px-6">
                 {sync
-                  ? `No network. Still checking codes on this device, against the list synced at ${formatTime(sync.savedAt)}.`
+                  ? `No network. Still checking codes on this device, against the list synced at ${formatTime(sync.savedAt, show.timezone)}.`
                   : "No network. Connect once to sync this show before doors."}
               </span>
             </motion.p>
@@ -438,8 +430,8 @@ export function Scanner({ show }: { show: ScannerShow }) {
           <Tally label="Admitted" value={admitted} />
           <Tally label="Turned away" value={log.rejected} />
           <div className="ml-auto text-right">
-            <p className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.16em] text-paper/50">Clock IST</p>
-            <p className="font-mono text-sm tabular-nums text-paper/80">{now ? formatClock(now) : "--:--:--"}</p>
+            <p className="whitespace-nowrap font-mono text-[10px] uppercase tracking-[0.16em] text-paper/50">Local time</p>
+            <p className="font-mono text-sm tabular-nums text-paper/80">{now ? formatClock(now, show.timezone) : "--:--:--"}</p>
           </div>
         </div>
       </div>
@@ -457,6 +449,7 @@ export function Scanner({ show }: { show: ScannerShow }) {
             </div>
             <aside className="min-w-0 space-y-8">
               <SyncStatus
+                timezone={show.timezone}
                 sync={sync}
                 now={now}
                 online={online}
@@ -464,7 +457,7 @@ export function Scanner({ show }: { show: ScannerShow }) {
                 error={syncError}
                 onSync={() => runSync(false)}
               />
-              <RecentScans entries={log.recent} />
+              <RecentScans timezone={show.timezone} entries={log.recent} />
               <button
                 type="button"
                 onClick={resetDoor}
@@ -477,7 +470,7 @@ export function Scanner({ show }: { show: ScannerShow }) {
         )}
       </div>
 
-      <ResultFlood flash={flash} onDismiss={() => setFlash(null)} />
+      <ResultFlood timezone={show.timezone} flash={flash} onDismiss={() => setFlash(null)} />
     </>
   );
 }
@@ -530,7 +523,7 @@ function SyncFirst({
       </h1>
       <p className="mt-4 text-paper/75">
         This downloads the Houseful signing key and the latest hand-backs for {show.title} on{" "}
-        {formatLongDate(show.startsAt)}. After that, this device checks every code itself and needs no network.
+        {formatLongDate(show.startsAt, show.timezone)}. After that, this device checks every code itself and needs no network.
       </p>
       <button
         type="button"
@@ -547,6 +540,7 @@ function SyncFirst({
 }
 
 function SyncStatus({
+  timezone,
   sync,
   now,
   online,
@@ -554,6 +548,7 @@ function SyncStatus({
   error,
   onSync,
 }: {
+  timezone: string;
   sync: SyncRecord;
   now: number | null;
   online: boolean;
@@ -575,7 +570,7 @@ function SyncStatus({
       <dl className="mt-5 divide-y divide-paper/10 border-y border-paper/10 font-mono text-[13px]">
         <Row label="Tickets on chain" value={`${sync.minted} of ${sync.capacity}`} />
         <Row label="Old codes blocked" value={String(blocked)} />
-        <Row label="Synced" value={`${formatTime(sync.savedAt)}, ${formatAge(age)}`} />
+        <Row label="Synced" value={`${formatTime(sync.savedAt, timezone)}, ${formatAge(age)}`} />
         <Row label="Issuer key" value={shortHex(sync.issuerPublicKey, 6, 4)} />
       </dl>
       <p className="mt-3 text-sm text-paper/60">
@@ -774,7 +769,7 @@ function PasteCode({ onCheck }: { onCheck: (text: string) => Flash | null }) {
   );
 }
 
-function RecentScans({ entries }: { entries: ScanEntry[] }) {
+function RecentScans({ entries, timezone }: { entries: ScanEntry[]; timezone: string }) {
   return (
     <section aria-labelledby="recent-scans">
       <h2 id="recent-scans" className="font-mono text-[11px] uppercase tracking-[0.16em] text-paper/55">
@@ -787,7 +782,7 @@ function RecentScans({ entries }: { entries: ScanEntry[] }) {
           {entries.slice(0, 8).map((entry) => (
             <li key={`${entry.at}-${entry.reason ?? "ok"}`} className="flex items-center gap-3 py-2">
               <span aria-hidden="true" className={`size-2.5 shrink-0 ${entry.ok ? "bg-admit" : "bg-reject"}`} />
-              <span className="tabular-nums text-paper/55">{formatClock(entry.at)}</span>
+              <span className="tabular-nums text-paper/55">{formatClock(entry.at, timezone)}</span>
               <span className="min-w-0 flex-1 truncate text-paper">
                 {entry.ok ? "Admitted" : reasonCopy[entry.reason ?? "malformed"].short}
               </span>
@@ -800,7 +795,7 @@ function RecentScans({ entries }: { entries: ScanEntry[] }) {
   );
 }
 
-function ResultFlood({ flash, onDismiss }: { flash: Flash | null; onDismiss: () => void }) {
+function ResultFlood({ flash, onDismiss, timezone }: { flash: Flash | null; onDismiss: () => void; timezone: string }) {
   const reduce = useReducedMotion();
   const wipe = reduce
     ? { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } }
@@ -826,7 +821,7 @@ function ResultFlood({ flash, onDismiss }: { flash: Flash | null; onDismiss: () 
         >
           <div className="flex items-start justify-between gap-4 font-mono text-xs uppercase tracking-[0.16em] text-paper/80">
             <span>{flash.ticket !== null ? `Ticket ${ticketNo(flash.ticket)}` : "Turned away"}</span>
-            <span className="tabular-nums">{formatClock(flash.at)}</span>
+            <span className="tabular-nums">{formatClock(flash.at, timezone)}</span>
           </div>
 
           <motion.div
@@ -864,7 +859,7 @@ function ResultFlood({ flash, onDismiss }: { flash: Flash | null; onDismiss: () 
                 </p>
                 <p className="mt-3 text-lg text-paper/85">
                   {flash.reason === "already-admitted" && flash.ticket !== null && flash.firstIn !== null
-                    ? `${ticketNo(flash.ticket)} came in at ${formatClock(flash.firstIn)} through this door.`
+                    ? `${ticketNo(flash.ticket)} came in at ${formatClock(flash.firstIn, timezone)} through this door.`
                     : reasonCopy[flash.reason].detail}
                 </p>
               </>

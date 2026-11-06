@@ -32,7 +32,7 @@ export default async function HostPage() {
   const events = await cityEvents("mumbai");
   const catalog: CatalogShow[] = events
     .filter((e) => e.chainEventId != null)
-    .map((e) => ({ chainEventId: e.chainEventId!, slug: e.slug, title: e.title, startsAt: e.startsAt, priceUsd: e.priceUsd }));
+    .map((e) => ({ chainEventId: e.chainEventId!, slug: e.slug, title: e.title, startsAt: e.startsAt, timezone: e.city.timezone, priceUsd: e.priceUsd }));
 
   return (
     <>

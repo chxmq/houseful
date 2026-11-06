@@ -8,6 +8,7 @@ export type EventRowData = {
   subtitle: string | null;
   category: string;
   startsAt: number;
+  city: { timezone: string };
   priceUsd: number;
   capacity: number;
   sold: number;
@@ -41,15 +42,15 @@ export function EventRow({ event, index = 0 }: { event: EventRowData; index?: nu
         className="grid grid-cols-[64px_1fr] items-baseline gap-x-5 gap-y-1 py-5 md:grid-cols-[88px_1fr_200px_140px] md:gap-x-8"
       >
         <div className="row-span-2 md:row-span-1">
-          <span className="block font-display text-[44px] font-black leading-[0.85] md:text-[56px]">{formatDayNum(event.startsAt)}</span>
+          <span className="block font-display text-[44px] font-black leading-[0.85] md:text-[56px]">{formatDayNum(event.startsAt, event.city.timezone)}</span>
           <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-            {formatMonShort(event.startsAt)} {formatWeekday(event.startsAt)}
+            {formatMonShort(event.startsAt, event.city.timezone)} {formatWeekday(event.startsAt, event.city.timezone)}
           </span>
         </div>
 
         <div className="min-w-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-            {categoryLabel[event.category] ?? event.category} · {formatTime(event.startsAt)}
+            {categoryLabel[event.category] ?? event.category} · {formatTime(event.startsAt, event.city.timezone)}
           </p>
           <h3 className="mt-1 font-display text-[28px] font-extrabold uppercase leading-[0.95] md:text-[34px]">{event.title}</h3>
           {event.subtitle ? <p className="mt-1 text-sm text-ink-soft">{event.subtitle}</p> : null}

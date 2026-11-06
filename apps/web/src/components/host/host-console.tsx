@@ -10,7 +10,7 @@ import { explainError } from "@/lib/ticket-actions";
 import { PlusIcon } from "../icons";
 import { SplitFlap } from "../motion/split-flap";
 
-export type CatalogShow = { chainEventId: number; slug: string; title: string; startsAt: number; priceUsd: number };
+export type CatalogShow = { chainEventId: number; slug: string; title: string; startsAt: number; timezone: string; priceUsd: number };
 
 export function HostConsole({ catalog }: { catalog: CatalogShow[] }) {
   const [wallet, setWallet] = useState<`0x${string}` | null>(null);
@@ -114,7 +114,7 @@ function HostedRow({
       <div>
         <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
           #{show.chainEventId} · {status}
-          {meta ? ` · ${formatLongDate(meta.startsAt)}` : ""}
+          {meta ? ` · ${formatLongDate(meta.startsAt, meta.timezone)}` : ""}
         </p>
         <h3 className="mt-1 font-display text-3xl font-extrabold uppercase leading-none">
           {meta ? <Link href={`/e/${meta.slug}`}>{meta.title}</Link> : `Show #${show.chainEventId}`}

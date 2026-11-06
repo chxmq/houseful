@@ -1,3 +1,5 @@
+import { formatDayNum, formatMonShort } from "@/lib/format";
+
 type Ink = "stamp" | "marigold" | "ink" | "admit";
 
 type EventPosterProps = {
@@ -6,6 +8,7 @@ type EventPosterProps = {
   variant: number;
   ink: Ink;
   startsAt: number;
+  timezone?: string;
   venue: string;
   className?: string;
 };
@@ -17,9 +20,6 @@ const palettes: Record<Ink, { bg: string; fg: string; accent: string }> = {
   admit: { bg: "#0f5a4a", fg: "#f1ece2", accent: "#f2a51a" },
 };
 
-const dayFmt = new Intl.DateTimeFormat("en-IN", { day: "2-digit", timeZone: "Asia/Kolkata" });
-const monFmt = new Intl.DateTimeFormat("en-IN", { month: "short", timeZone: "Asia/Kolkata" });
-
 function hash(input: string) {
   let h = 2166136261;
   for (let i = 0; i < input.length; i++) {
@@ -29,12 +29,11 @@ function hash(input: string) {
   return h >>> 0;
 }
 
-export function EventPoster({ title, subtitle, variant, ink, startsAt, venue, className = "" }: EventPosterProps) {
+export function EventPoster({ title, subtitle, variant, ink, startsAt, timezone, venue, className = "" }: EventPosterProps) {
   const p = palettes[ink];
   const seed = hash(title);
-  const date = new Date(startsAt * 1000);
-  const day = dayFmt.format(date);
-  const month = monFmt.format(date).toUpperCase();
+  const day = formatDayNum(startsAt, timezone);
+  const month = formatMonShort(startsAt, timezone);
   const words = title.toUpperCase().split(/\s+/);
   const tilt = ((seed % 7) - 3) * 1.5;
 

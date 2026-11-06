@@ -19,6 +19,7 @@ export default async function TicketsPage() {
       chainEventId: e.chainEventId!,
       title: e.title,
       startsAt: e.startsAt,
+      timezone: e.city.timezone,
       doorsAt: e.doorsAt,
       priceUsd: e.priceUsd,
       venue: e.venue.name,

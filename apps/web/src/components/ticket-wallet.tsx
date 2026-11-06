@@ -27,6 +27,7 @@ export type WalletEvent = {
   chainEventId: number;
   title: string;
   startsAt: number;
+  timezone: string;
   doorsAt: number;
   priceUsd: number;
   venue: string;
@@ -243,11 +244,11 @@ function HeldTicket({
         tone="ink"
         torn={torn}
         onTornComplete={() => result && onChanged(result)}
-        eyebrow={`Admit one · ${formatLongDate(event.startsAt)}`}
+        eyebrow={`Admit one · ${formatLongDate(event.startsAt, event.timezone)}`}
         title={event.title}
         lines={[
           { label: "Venue", value: event.venue },
-          { label: "Doors", value: formatTime(event.doorsAt) },
+          { label: "Doors", value: formatTime(event.doorsAt, event.timezone) },
           { label: "Paid", value: formatUsdt(event.priceUsd) },
           { label: "Seat", value: seatCaption(holding.seat) },
         ]}
@@ -351,7 +352,7 @@ function WaitingSpot({
   return (
     <li className="max-w-[640px] rounded-[4px] border border-ink/15 p-6">
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-        Waitlist · {formatLongDate(event.startsAt)}
+        Waitlist · {formatLongDate(event.startsAt, event.timezone)}
       </p>
       <div className="mt-2 flex items-end justify-between gap-6">
         <h3 className="font-display text-4xl font-black uppercase leading-[0.9]">{event.title}</h3>

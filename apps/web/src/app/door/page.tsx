@@ -65,7 +65,7 @@ async function ShowList() {
             <div className="min-w-0 flex-1">
               <p className="font-display text-3xl font-extrabold uppercase leading-[0.95]">{show.title}</p>
               <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.14em] text-paper/60">
-                {show.venue.name} · {formatLongDate(show.startsAt)} · Doors {formatTime(show.doorsAt)}
+                {show.venue.name} · {formatLongDate(show.startsAt, show.city.timezone)} · Doors {formatTime(show.doorsAt, show.city.timezone)}
               </p>
             </div>
             <span className="hidden font-mono text-[11px] uppercase tracking-[0.14em] text-paper/60 sm:block">

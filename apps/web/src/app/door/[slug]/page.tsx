@@ -45,6 +45,7 @@ async function DoorContent({ params }: Pick<PageProps<"/door/[slug]">, "params">
         title: e.title,
         venue: e.venue.name,
         startsAt: e.startsAt,
+        timezone: e.city.timezone,
         doorsAt: e.doorsAt,
       }}
     />

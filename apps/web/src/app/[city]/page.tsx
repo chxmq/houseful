@@ -35,12 +35,12 @@ export default function CityPage({ params, searchParams }: PageProps<"/[city]">)
 
 type Grouped = { label: string; events: EventRowData[] };
 
-function groupByWeek(events: EventRowData[]): Grouped[] {
+function groupByWeek(events: EventRowData[], timezone: string): Grouped[] {
   const groups = new Map<string, EventRowData[]>();
   for (const e of events) {
     const d = new Date(e.startsAt * 1000);
-    const label = new Intl.DateTimeFormat("en-IN", { month: "long", timeZone: "Asia/Kolkata" }).format(d);
-    const day = Number(new Intl.DateTimeFormat("en-IN", { day: "numeric", timeZone: "Asia/Kolkata" }).format(d));
+    const label = new Intl.DateTimeFormat("en-IN", { month: "long", timeZone: timezone }).format(d);
+    const day = Number(new Intl.DateTimeFormat("en-IN", { day: "numeric", timeZone: timezone }).format(d));
     const key = day <= 15 ? `Early ${label}` : `Late ${label}`;
     groups.set(key, [...(groups.get(key) ?? []), e]);
   }
@@ -119,6 +119,7 @@ async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, 
                         variant={e.posterVariant}
                         ink={e.posterInk}
                         startsAt={e.startsAt}
+                        timezone={e.city.timezone}
                         venue={e.venue.name}
                         className="rounded-[4px]"
                       />
@@ -133,7 +134,7 @@ async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, 
                       <p className="shrink-0 font-mono text-xs">{formatUsdt(e.priceUsd)}</p>
                     </div>
                     <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-                      {formatWeekday(e.startsAt)} {formatDayMonth(e.startsAt)} · {e.venue.area}
+                      {formatWeekday(e.startsAt, e.city.timezone)} {formatDayMonth(e.startsAt, e.city.timezone)} · {e.venue.area}
                     </p>
                   </Link>
                 </Deal>
@@ -164,7 +165,7 @@ async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, 
                       <span>
                         <span className="block font-display text-3xl font-extrabold uppercase leading-none">{e.title}</span>
                         <span className="mt-1 block font-mono text-[11px] uppercase tracking-[0.14em] text-paper/55">
-                          {formatWeekday(e.startsAt)} {formatDayMonth(e.startsAt)} · {e.venue.name}
+                          {formatWeekday(e.startsAt, e.city.timezone)} {formatDayMonth(e.startsAt, e.city.timezone)} · {e.venue.name}
                         </span>
                       </span>
                       <span className="shrink-0 font-mono text-sm text-marigold">Join waitlist</span>
@@ -177,7 +178,7 @@ async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, 
         ) : null}
 
         <section className="mx-auto max-w-[1320px] px-5 py-16 md:px-8">
-          {groupByWeek(upcoming).map((group) => (
+          {groupByWeek(upcoming, city.timezone).map((group) => (
             <div key={group.label} className="mb-14">
               <h2 className="mb-2 font-mono text-xs uppercase tracking-[0.18em] text-muted">{group.label}</h2>
               {group.events.map((e, i) => (

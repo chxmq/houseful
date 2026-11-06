@@ -40,7 +40,7 @@ async function WaitlistContent({ params }: Pick<PageProps<"/e/[slug]/waitlist">,
         </h1>
         <div className="mt-5 grid gap-6 text-ink-soft md:grid-cols-2">
           <p>
-            Everyone waiting for {e.title} on {formatLongDate(e.startsAt)}, in the order they joined. Each live join is
+            Everyone waiting for {e.title} on {formatLongDate(e.startsAt, e.city.timezone)}, in the order they joined. Each live join is
             one World ID with one place in line; seeded demo seats skipped verification. When a ticket comes back it
             goes to the first person still waiting. Nobody, including the host, can reorder it.
           </p>

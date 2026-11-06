@@ -57,6 +57,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
                 variant={e.posterVariant}
                 ink={e.posterInk}
                 startsAt={e.startsAt}
+                timezone={e.city.timezone}
                 venue={e.venue.name}
                 className="rounded-[6px] shadow-[0_40px_80px_-28px_rgba(0,0,0,0.65)] ring-1 ring-paper/10"
               />
@@ -82,9 +83,9 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
                   <CalendarIcon className="mt-0.5 shrink-0 text-marigold" />
                   <div>
                     <dt className="sr-only">When</dt>
-                    <dd className="font-medium text-paper">{formatLongDate(e.startsAt)}</dd>
+                    <dd className="font-medium text-paper">{formatLongDate(e.startsAt, e.city.timezone)}</dd>
                     <dd className="text-sm text-paper/55">
-                      Doors {formatTime(e.doorsAt)} · starts {formatTime(e.startsAt)}
+                      Doors {formatTime(e.doorsAt, e.city.timezone)} · starts {formatTime(e.startsAt, e.city.timezone)}
                     </dd>
                   </div>
                 </div>
@@ -115,6 +116,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
                     sold: e.sold,
                     status: e.status,
                     startsAt: e.startsAt,
+                    timezone: e.city.timezone,
                     venue: e.venue.name,
                     assurance,
                   }}
