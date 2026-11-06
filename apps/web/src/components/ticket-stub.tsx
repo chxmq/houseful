@@ -34,7 +34,7 @@ export function TicketStub({
       <motion.div
         animate={torn && !reduce ? { rotate: -2.5, x: -10, y: 6 } : { rotate: 0, x: 0, y: 0 }}
         transition={tear}
-        className={`relative flex-1 rounded-l-[14px] p-6 ${surface}`}
+        className={`relative min-w-0 flex-1 rounded-l-[14px] p-5 sm:p-6 ${surface}`}
         style={{ transformOrigin: "0% 100%" }}
       >
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] opacity-70">{eyebrow}</p>
@@ -67,7 +67,7 @@ export function TicketStub({
         }
         transition={torn ? { ...tear, opacity: { delay: 0.55, duration: 0.35 } } : tear}
         onAnimationComplete={() => torn && onTornComplete?.()}
-        className={`relative flex w-[34%] min-w-[150px] flex-col items-center justify-center rounded-r-[14px] p-5 ${surface}`}
+        className={`relative flex w-[34%] min-w-[136px] flex-col items-center justify-center rounded-r-[14px] p-3 sm:p-5 ${surface}`}
         style={{ transformOrigin: "0% 0%" }}
       >
         {stub}
