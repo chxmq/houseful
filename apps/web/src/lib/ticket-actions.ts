@@ -109,7 +109,7 @@ export async function send(
   }
 
   const { request } = await publicClient.simulateContract({
-    account: signer.address,
+    account: signer.client.account,
     address,
     abi: housefulAbi,
     functionName,
@@ -170,7 +170,7 @@ async function approveUsdt(signer: ActionSigner, amount: bigint) {
   });
   if (allowance >= amount) return;
   const { request } = await publicClient.simulateContract({
-    account: signer.address,
+    account: signer.client.account,
     address: token,
     abi: usdtAbi,
     functionName: "approve",
