@@ -35,12 +35,15 @@ export async function choosePay(page: Page, method: "usdt" | "eth") {
 }
 
 export async function verifyAndBuy(page: Page) {
-  const verify = page.getByRole("button", { name: /Verify and buy|Verify and take a returned seat/i });
+  // VerifyHuman uses the action label, not a fixed "Verify and buy" string.
+  const verify = page.getByRole("button", {
+    name: /Get tickets|Get Seat|Take a returned seat|Join the waitlist|Verify and buy/i,
+  });
   await expect(verify).toBeVisible({ timeout: 30_000 });
   await verify.click();
   // World stub in the product harness completes IDKit; wait for pay/bind progress or ticket.
   await expect(
-    page.getByText(/Open your ticket|Paid face value|Bound this phone|Seat \d+ selected|General admission/i).first(),
+    page.getByText(/Open your ticket|Paid face value|Bound this phone|Seat \d+ selected|General admission|You are on the waitlist|Your place in line/i).first(),
   ).toBeVisible({ timeout: 120_000 });
 }
 

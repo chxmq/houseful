@@ -48,7 +48,7 @@ test.describe("seat and pay", () => {
         await verifyAndBuy(rival);
 
         await choosePay(page, "usdt");
-        const verify = page.getByRole("button", { name: /Verify and buy/i });
+        const verify = page.getByRole("button", { name: /Get tickets|Get Seat|Verify and buy/i });
         await verify.click();
         await expectSeatTakenMessage(page);
         await rival.close();

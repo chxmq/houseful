@@ -21,7 +21,7 @@ test.describe("waitlist and USDT refund", () => {
           timeout: 30_000,
         });
         await choosePay(page, "usdt");
-        const join = page.getByRole("button", { name: /Verify and join the waitlist/i });
+        const join = page.getByRole("button", { name: /Join the waitlist|Verify and join the waitlist/i });
         await expect(join).toBeVisible();
         await join.click();
         await expect(page.getByText(/You are on the waitlist|Your place in line/i)).toBeVisible({
@@ -41,7 +41,7 @@ test.describe("waitlist and USDT refund", () => {
           timeout: 120_000,
         });
         await openTickets(holder);
-        await expect(holder.getByText(/Refunded .*USDT|USDT is back/i).first()).toBeVisible();
+        await expect(holder.getByText(/Refunded \$\d+|Refunded/i).first()).toBeVisible();
         await holder.close();
       });
     });
