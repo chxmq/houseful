@@ -37,18 +37,15 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
       <SiteHeader city={{ slug: e.citySlug, name: e.city?.name ?? e.citySlug }} />
 
       <main id="main" className="flex-1">
+        <aside className="border-b border-ink/20 px-5 py-4 text-sm md:px-8" aria-label="Test listing">
+          <div className="mx-auto max-w-[1256px]">
+            <p>Test listing, not affiliated with the artist or organiser. A booking here does not give real admission.</p>
+            {e.officialUrl ? (
+              <a href={e.officialUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block py-1 font-medium underline">Official event and tickets (opens a new tab)</a>
+            ) : <p className="mt-1 text-muted">This is a sample show created for testing.</p>}
+          </div>
+        </aside>
         <div className="relative overflow-hidden border-b border-ink/10 bg-ink text-paper">
-          <div
-            className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full opacity-40 blur-3xl"
-            style={{ background: "radial-gradient(circle, rgba(226,64,27,0.55), transparent 70%)" }}
-            aria-hidden
-          />
-          <div
-            className="pointer-events-none absolute -bottom-32 -left-16 size-[22rem] rounded-full opacity-30 blur-3xl"
-            style={{ background: "radial-gradient(circle, rgba(242,165,26,0.35), transparent 70%)" }}
-            aria-hidden
-          />
-
           <div className="relative mx-auto grid w-full max-w-[1320px] gap-10 px-5 py-10 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-14 md:px-8 md:py-14">
             <div className="md:sticky md:top-24 md:self-start">
               <EventPoster
@@ -59,7 +56,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
                 startsAt={e.startsAt}
                 timezone={e.city.timezone}
                 venue={e.venue.name}
-                className="rounded-[6px] shadow-[0_40px_80px_-28px_rgba(0,0,0,0.65)] ring-1 ring-paper/10"
+                className="rounded-[6px] ring-1 ring-paper/10"
               />
             </div>
 
@@ -71,7 +68,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
                 {" · "}
                 {e.language}
                 {" · "}
-                {/^\d+$/.test(String(e.ageLimit)) ? `${e.ageLimit}+` : e.ageLimit}
+                {e.published?.age === false ? "Age rules: Not published" : e.ageLimit === 0 ? "All ages" : `${e.ageLimit}+`}
               </p>
               <h1 className="mt-4 font-display text-[clamp(3rem,8vw,6.25rem)] font-black uppercase leading-[0.82] text-paper">
                 <RiseText text={e.title} />
@@ -83,9 +80,9 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
                   <CalendarIcon className="mt-0.5 shrink-0 text-marigold" />
                   <div>
                     <dt className="sr-only">When</dt>
-                    <dd className="font-medium text-paper">{formatLongDate(e.startsAt, e.city.timezone)}</dd>
+                    <dd className="font-medium text-paper">{formatLongDate(e.startsAt, e.city.timezone)}, {new Intl.DateTimeFormat("en-IN", { year: "numeric", timeZone: e.city.timezone }).format(new Date(e.startsAt * 1000))}</dd>
                     <dd className="text-sm text-paper/55">
-                      Doors {formatTime(e.doorsAt, e.city.timezone)} · starts {formatTime(e.startsAt, e.city.timezone)}
+                      Doors {formatTime(e.doorsAt, e.city.timezone)} · starts {e.published?.startTime === false ? "Not published" : formatTime(e.startsAt, e.city.timezone)}
                     </dd>
                   </div>
                 </div>
@@ -103,7 +100,15 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
                 </div>
               </dl>
 
-              <div className="mt-8 rounded-[6px] bg-paper p-5 text-ink shadow-[0_24px_60px_-30px_rgba(0,0,0,0.55)] sm:p-6">
+              {e.officialUrl ? (
+                <dl className="mt-5 space-y-2 text-sm text-paper/70">
+                  <div><dt className="inline">Official end time: </dt><dd className="inline">{e.published?.endTime ? formatTime(e.endsAt, e.city.timezone) : "Not published"}</dd></div>
+                  <div><dt className="inline">Venue capacity: </dt><dd className="inline">{e.published?.capacity ? e.venue.capacity.toLocaleString("en-IN") : "Not published"}</dd></div>
+                  <div><dt className="inline">Duration: </dt><dd className="inline">{e.published?.duration ? `${e.durationMins} minutes` : "Not published"}</dd></div>
+                  <div><dt className="inline">Test booking settings: </dt><dd className="inline">availability and seats are demo allocations. Any booking window is for this test only.</dd></div>
+                </dl>
+              ) : null}
+              <div className="mt-8 rounded-[6px] bg-paper p-5 text-ink sm:p-6">
                 <TicketPanel
                   event={{
                     id: e.id,

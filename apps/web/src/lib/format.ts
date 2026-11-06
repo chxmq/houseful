@@ -20,7 +20,7 @@ export const formatWeekday = dateFormatter({ weekday: "short" });
 export const formatDayMonth = dateFormatter({ day: "numeric", month: "short" });
 export const formatLongDate = dateFormatter({ weekday: "long", day: "numeric", month: "long" });
 const time = dateFormatter({ hour: "numeric", minute: "2-digit", hour12: true });
-export const formatTime = (seconds: number, timezone = DEFAULT_TIMEZONE) => time(seconds, timezone).toLowerCase().replace(" ", "");
+export const formatTime = (seconds: number, timezone = DEFAULT_TIMEZONE) => seconds === 0 ? "Not published" : time(seconds, timezone).toLowerCase().replace(" ", "");
 export const formatDayNum = dateFormatter({ day: "2-digit" });
 const month = dateFormatter({ month: "short" });
 export const formatMonShort = (seconds: number, timezone = DEFAULT_TIMEZONE) => month(seconds, timezone).toUpperCase();

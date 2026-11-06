@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { TicketWallet, type WalletEvent } from "@/components/ticket-wallet";
 import { WalletBackup } from "@/components/wallet-backup";
 import { requireFan } from "@/server/auth/session";
-import { cityEventsForWallet } from "@/server/queries";
+import { cities, cityEventsForWallet } from "@/server/queries";
 
 export const metadata: Metadata = { title: "Your tickets" };
 
@@ -16,7 +16,8 @@ export default function TicketsPage() {
 
 async function PageContent() {
   await requireFan("/tickets");
-  const events = await cityEventsForWallet("mumbai");
+  const allCities = await cities();
+  const events = (await Promise.all(allCities.map(city => cityEventsForWallet(city.slug)))).flat();
   const onChain: WalletEvent[] = events
     .filter((e) => e.chainEventId != null)
     .map((e) => ({
@@ -32,7 +33,7 @@ async function PageContent() {
 
   return (
     <>
-      <SiteHeader city={{ slug: "mumbai", name: "Mumbai" }} />
+      <SiteHeader />
       <main id="main" className="mx-auto w-full max-w-[1320px] flex-1 px-5 pb-24 pt-12 md:px-8 md:pt-16">
         <h1 className="font-display text-[clamp(3.5rem,10vw,8rem)] font-black uppercase leading-[0.82]">
           <RiseText text="Your tickets" />

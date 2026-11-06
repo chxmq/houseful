@@ -218,3 +218,8 @@ describe("event city timezones", () => {
     expect(formatDayMonth(at, "Europe/London")).toBe("7 Nov");
   });
 });
+
+it("shows the unpublished-time marker without inventing a door time", () => {
+  expect(formatTime(0, "Europe/London")).toBe("Not published");
+  expect(formatTime(0, "Asia/Kolkata")).toBe("Not published");
+});

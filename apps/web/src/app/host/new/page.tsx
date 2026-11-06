@@ -16,6 +16,7 @@ async function mumbaiVenues(): Promise<VenueOption[]> {
   cacheLife("hours");
   const venues = await listVenues("mumbai");
   return venues
+    .filter(venue => venue.capacity > 0)
     .map((v) => ({ id: v.id, name: v.name, area: v.area, capacity: v.capacity }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -44,8 +45,8 @@ async function PageContent() {
           <RiseText text="List a show" />
         </h1>
         <p className="mt-4 max-w-[58ch] text-ink-soft">
-          Your terms are written to a public contract the moment you list. Face value is fixed, every ticket belongs to a
-          verified person, and a cancelled show refunds everyone without asking you.
+          Set a fixed ticket price and a return deadline. Each person can hold one ticket. If you cancel, fans can ask
+          for their payment back without waiting for your approval.
         </p>
         <div className="mt-14">
           <Suspense fallback={<p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Loading venues</p>}>

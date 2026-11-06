@@ -50,7 +50,7 @@ async function VenueContent({ params }: Pick<PageProps<"/v/[slug]">, "params">) 
     <>
       <SiteHeader city={v.city} />
 
-      <main className="flex-1">
+      <main id="main" className="flex-1">
         <section className="mx-auto max-w-[1320px] px-5 pb-12 pt-12 md:px-8 md:pt-20">
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted">
             {kind} · {v.area}, {v.city.name}
@@ -68,7 +68,7 @@ async function VenueContent({ params }: Pick<PageProps<"/v/[slug]">, "params">) 
               <dt className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
                 {gathering ? "Group size" : "Capacity"}
               </dt>
-              <dd className="mt-1 font-display text-3xl font-bold uppercase">{count.format(v.capacity)}</dd>
+              <dd className="mt-1 font-display text-3xl font-bold uppercase">{v.capacity > 0 ? count.format(v.capacity) : "Not published"}</dd>
             </div>
             <div>
               <dt className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">

@@ -19,8 +19,15 @@ async function main() {
 
   const mumbai = await catalog.listEvents({ city: "mumbai", now });
   console.log("mumbai upcoming", mumbai.length);
-  assert(mumbai.length === 17, "17 upcoming Mumbai events (one is past)");
+  assert(mumbai.length === 19, "17 upcoming Mumbai samples and two imported test listings");
   assert(mumbai.every((e) => Array.isArray(e.lineup) && e.venue.name && e.host.name && e.city.name), "joined shape");
+
+  assert(cities.length === 20, "20 catalog cities");
+  const london = await catalog.getEvent("the-nutcracker-royal-ballet-royal-opera-house-2026-12-03");
+  assert(london?.city.timezone === "Europe/London" && london.officialUrl, "source-backed London listing");
+  assert(london.seated && london.doorsAt === 0 && london.published?.doors === false, "unpublished doors stay unpublished");
+  const doha = await catalog.getEvent("web-summit-qatar-2027-doha");
+  assert(doha?.published?.startTime === false && doha.published.endTime === false, "date-only draft clock times stay unpublished");
 
   const tonight = await catalog.listEvents({ city: "mumbai", when: "tonight", now });
   const weekend = await catalog.listEvents({ city: "mumbai", when: "weekend", now });

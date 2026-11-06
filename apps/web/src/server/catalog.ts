@@ -1,4 +1,5 @@
 import "server-only";
+import { publishedDetails, type PublishedDetails } from "../lib/catalog-facts";
 import { and, asc, eq, gt, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "./db/client";
 import { buildSearchQuery, type SearchFilters } from "./search-query";
@@ -66,6 +67,9 @@ export type EventSummary = {
   endsAt: number;
   priceUsd: number;
   faceValueUnits: string;
+  published?: PublishedDetails;
+  officialUrl: string;
+  sourceUrl: string;
   seated: boolean;
   capacity: number;
   sold: number;
@@ -144,6 +148,7 @@ function baseEvent(e: typeof events.$inferSelect) {
   return {
     ...rest,
     slug: e.id,
+    published: publishedDetails(e.id),
     categoryLabel: CATEGORY_LABELS[e.category],
     remaining: Math.max(0, e.capacity - e.sold),
     lineup: [...e.lineup],

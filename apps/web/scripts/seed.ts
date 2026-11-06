@@ -1,4 +1,6 @@
 import "./load-env";
+import catalogDrafts from "./data/catalog-drafts.json";
+import { buildWorldwideCatalog } from "./worldwide-catalog";
 import { client, db } from "../src/server/db/connection";
 import {
   cities,
@@ -117,7 +119,7 @@ type EventSeed = {
   surrenderCutoffHours: number;
 };
 
-// Mumbai events come first: their order defines chainEventId 1..N, which the contracts seed mirrors.
+// Keep the existing Mumbai ids 1..18, then assign the other sample and worldwide test listings.
 const eventSeeds: EventSeed[] = [
   {
     slug: "the-last-local-nsci-dome",
@@ -1048,7 +1050,7 @@ function buildEvents(): NewEvent[] {
     if (e.status === "announced" && e.sold !== 0) throw new Error(`${e.slug}: announced must have no sales`);
     return {
       id: e.slug,
-      chainEventId: e.city === "mumbai" ? nextChainId++ : null,
+      chainEventId: nextChainId++,
       title: e.title,
       subtitle: e.subtitle,
       category: e.category,
@@ -1060,7 +1062,7 @@ function buildEvents(): NewEvent[] {
       endsAt,
       priceUsd: e.priceUsd,
       faceValueUnits: usdToUnits(e.priceUsd),
-      seated: false,
+      seated: ["theatre", "auditorium", "arena"].includes(venueSeeds.find(venue => venue.slug === e.venue)?.kind ?? ""),
       officialUrl: "",
       sourceUrl: "",
       capacity: e.capacity,
@@ -1089,17 +1091,20 @@ function assertCleanCopy(rows: NewEvent[]) {
 }
 
 async function main() {
-  const eventRows = buildEvents();
+  const sampleRows = buildEvents();
+  const worldwide = buildWorldwideCatalog(catalogDrafts, sampleRows.length + 1);
+  const eventRows = [...sampleRows, ...worldwide.events];
+  const allCities = [...cityRows, ...worldwide.cities.filter(city => !cityRows.some(existing => existing.slug === city.slug))];
   assertCleanCopy(eventRows);
 
-  const venueRows: NewVenue[] = venueSeeds.map((v) => ({ ...v, id: v.slug }));
-  const hostRows: NewHost[] = hostSeeds.map((h) => ({ ...h, id: h.slug, payoutAddress: null }));
+  const venueRows: NewVenue[] = [...venueSeeds.map((v) => ({ ...v, id: v.slug })), ...worldwide.venues];
+  const hostRows: NewHost[] = [...hostSeeds.map((h) => ({ ...h, id: h.slug, payoutAddress: null })), ...worldwide.hosts];
 
   for (const row of eventRows) {
     const venue = venueRows.find((v) => v.id === row.venueId);
     if (!venue) throw new Error(`${row.id}: unknown venue ${row.venueId}`);
     if (venue.citySlug !== row.citySlug) throw new Error(`${row.id}: venue is in another city`);
-    if (row.capacity > venue.capacity) throw new Error(`${row.id}: capacity exceeds venue`);
+    if (venue.capacity > 0 && row.capacity > venue.capacity) throw new Error(`${row.id}: capacity exceeds venue`);
     if (!hostRows.some((h) => h.id === row.hostId)) throw new Error(`${row.id}: unknown host ${row.hostId}`);
   }
 
@@ -1108,7 +1113,7 @@ async function main() {
     await tx.delete(hosts);
     await tx.delete(venues);
     await tx.delete(cities);
-    await tx.insert(cities).values(cityRows);
+    await tx.insert(cities).values(allCities);
     await tx.insert(venues).values(venueRows);
     await tx.insert(hosts).values(hostRows);
     await tx.insert(events).values(eventRows);
@@ -1116,7 +1121,7 @@ async function main() {
 
   const mumbai = eventRows.filter((e) => e.citySlug === "mumbai").length;
   console.log(
-    `Seeded ${cityRows.length} cities, ${venueRows.length} venues, ${hostRows.length} hosts, ${eventRows.length} events (${mumbai} in Mumbai with chain ids 1..${mumbai}).`,
+    `Seeded ${allCities.length} cities, ${venueRows.length} venues, ${hostRows.length} hosts, ${eventRows.length} events (${mumbai} in Mumbai; ${worldwide.events.length} source-backed test listings; all have chain ids).`,
   );
 }
 

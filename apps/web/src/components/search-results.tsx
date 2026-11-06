@@ -22,14 +22,14 @@ export function SearchResults({ events, resetHref = "/search", allCitiesHref = "
       ) : (
         <ol className="mt-5 divide-y divide-ink/20 border-y border-ink/20">
           {events.map(event => {
-            const date = new Intl.DateTimeFormat("en-IN", { timeZone: event.city.timezone, weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(event.startsAt * 1000));
+            const date = new Intl.DateTimeFormat("en-IN", { timeZone: event.city.timezone, weekday: "short", day: "numeric", month: "short", year: "numeric", ...(event.published?.startTime === false ? {} : { hour: "numeric", minute: "2-digit" }) }).format(new Date(event.startsAt * 1000));
             return (
               <li key={event.id} className="py-6">
                 <Link href={`/e/${event.id}`} className="grid min-w-0 gap-3 md:grid-cols-[1fr_auto]">
                   <div className="min-w-0">
                     <p className="text-sm text-ink-soft">{event.categoryLabel} · {event.city.name}</p>
                     <h3 className="mt-1 break-words font-display text-3xl font-bold uppercase leading-tight">{event.title}</h3>
-                    <p className="mt-2 text-sm"><time dateTime={new Date(event.startsAt * 1000).toISOString()}>{date}</time> <span className="text-muted">(local time)</span></p>
+                    <p className="mt-2 text-sm"><time dateTime={new Date(event.startsAt * 1000).toISOString()}>{date}</time>{event.published?.startTime === false ? " · Start time: Not published" : null} <span className="text-muted">(local time)</span></p>
                     <p className="mt-1 text-sm text-ink-soft">{event.venue.name} · {event.venue.area}</p>
                   </div>
                   <div className="md:text-right">

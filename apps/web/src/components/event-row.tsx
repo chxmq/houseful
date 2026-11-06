@@ -9,6 +9,7 @@ export type EventRowData = {
   category: string;
   startsAt: number;
   city: { timezone: string };
+  published?: { startTime: boolean };
   priceUsd: number;
   capacity: number;
   sold: number;
@@ -50,7 +51,7 @@ export function EventRow({ event, index = 0 }: { event: EventRowData; index?: nu
 
         <div className="min-w-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-            {categoryLabel[event.category] ?? event.category} · {formatTime(event.startsAt, event.city.timezone)}
+            {categoryLabel[event.category] ?? event.category} · {event.published?.startTime === false ? "Not published" : formatTime(event.startsAt, event.city.timezone)}
           </p>
           <h3 className="mt-1 font-display text-[28px] font-extrabold uppercase leading-[0.95] md:text-[34px]">{event.title}</h3>
           {event.subtitle ? <p className="mt-1 text-sm text-ink-soft">{event.subtitle}</p> : null}
