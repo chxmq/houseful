@@ -9,3 +9,5 @@ allowBuilds:
   secp256k1: false
 verifyDepsBeforeRun: false
 confirmModulesPurge: false
+minimumReleaseAgeExclude:
+  - playwright-core@1.65.0

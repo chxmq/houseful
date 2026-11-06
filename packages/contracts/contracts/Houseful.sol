@@ -5,24 +5,43 @@ import {Ownable, Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SaleEscrow} from "./SaleEscrow.sol";
 
+interface ISwapRouter02 {
+    struct ExactOutputSingleParams {
+        address tokenIn;
+        address tokenOut;
+        uint24 fee;
+        address recipient;
+        uint256 amountOut;
+        uint256 amountInMaximum;
+        uint160 sqrtPriceLimitX96;
+    }
+
+    function exactOutputSingle(ExactOutputSingleParams calldata params) external payable returns (uint256 amountIn);
+    function refundETH() external payable;
+    function multicall(bytes[] calldata data) external payable returns (bytes[] memory results);
+}
+
 /// @title Houseful
-/// @notice Ticket registry where every ticket is bound to one verified human, is sold only at face
-/// value, and changes hands only by surrender to the next person on a public waitlist.
-/// @dev World ID proofs are verified off-chain by the platform, which then signs an EIP-712
-/// `Attestation` with the `verifier` key. Ticket ids are per-event indices starting at 0.
+/// @notice Ticket registry where every ticket is bound to one verified human, sold only at face
+/// value in USDT, and changes hands only by surrender to the next person on a public waitlist.
+/// @dev World ID proofs are verified off-chain. The platform signs an EIP-712 Attestation. Fans may
+/// pay in USDT or in ETH swapped through Uniswap SwapRouter02 inside the same transaction.
 contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     enum Purpose {
         None,
         Buy,
         Join,
-        Claim
+        Claim,
+        Recover
     }
 
     struct EventParams {
         uint256 faceValue;
         uint256 capacity;
+        bool seated;
         uint64 saleStart;
         uint64 surrenderCutoff;
         uint64 endsAt;
@@ -34,6 +53,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         address host;
         uint256 faceValue;
         uint256 capacity;
+        bool seated;
         uint64 saleStart;
         uint64 surrenderCutoff;
         uint64 endsAt;
@@ -63,6 +83,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         uint64 endsAt;
         bool cancelled;
         bool proceedsWithdrawn;
+        bool seated;
         uint256 faceValue;
         uint256 capacity;
         uint256 minted;
@@ -77,6 +98,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     struct Ticket {
         address owner;
         uint64 generation;
+        uint32 seat;
         uint256 nullifier;
         bytes32 doorKey;
     }
@@ -85,10 +107,13 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         keccak256("Attestation(uint256 eventId,uint256 nullifier,address wallet,uint8 purpose,uint256 deadline)");
 
     /// @notice Most waitlist slots a surrender will step over looking for the next active waiter.
-    /// Longer runs of departed slots are cleared first with `advanceWaitlist`, which anyone can call.
     uint256 public constant WAITLIST_SCAN_LIMIT = 64;
 
     address public verifier;
+    address public immutable usdt;
+    address public immutable swapRouter;
+    address public immutable weth;
+    uint24 public immutable poolFee;
     uint256 public eventCount;
 
     mapping(uint256 eventId => EventData) private _events;
@@ -99,6 +124,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     mapping(uint256 eventId => mapping(address wallet => uint256)) private _waitPositionPlusOne;
     mapping(uint256 eventId => uint256[]) private _returnedIds;
     mapping(uint256 eventId => mapping(uint256 ticketId => uint256)) private _returnedIndexPlusOne;
+    mapping(uint256 eventId => mapping(uint32 seat => uint256)) private _seatTicketIdPlusOne;
     mapping(bytes32 digest => bool) private _attestationSpent;
 
     event VerifierUpdated(address indexed previousVerifier, address indexed newVerifier);
@@ -107,13 +133,20 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         address indexed host,
         uint256 faceValue,
         uint256 capacity,
+        bool seated,
         uint64 saleStart,
         uint64 surrenderCutoff,
         uint64 endsAt,
         string metadataURI,
         bytes32 metadataHash
     );
-    event TicketBought(uint256 indexed eventId, uint256 indexed ticketId, address indexed owner, uint256 nullifier);
+    event TicketBought(
+        uint256 indexed eventId,
+        uint256 indexed ticketId,
+        address indexed owner,
+        uint32 seat,
+        uint256 nullifier
+    );
     event WaitlistJoined(
         uint256 indexed eventId,
         uint256 indexed position,
@@ -130,7 +163,19 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         address to,
         uint256 generation
     );
-    event ReturnedClaimed(uint256 indexed eventId, uint256 indexed ticketId, address indexed owner, uint256 nullifier);
+    event ReturnedClaimed(
+        uint256 indexed eventId,
+        uint256 indexed ticketId,
+        address indexed owner,
+        uint32 seat,
+        uint256 nullifier
+    );
+    event TicketRecovered(
+        uint256 indexed eventId,
+        uint256 indexed ticketId,
+        address indexed to,
+        uint256 generation
+    );
     event DoorKeySet(uint256 indexed eventId, uint256 indexed ticketId, address indexed owner, bytes32 doorKey);
     event EventCancelled(uint256 indexed eventId);
     event RefundClaimed(uint256 indexed eventId, address indexed wallet, uint256 amount);
@@ -164,23 +209,37 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
     error AttestationSpent();
     error InvalidAttestation();
     error WaitlistBacklog();
+    error SeatTaken(uint32 seat);
+    error InvalidSeat(uint32 seat);
+    error WrongNullifier();
+    error EthTransferFailed();
 
     modifier onlyHost(uint256 eventId) {
         if (_existing(eventId).host != msg.sender) revert NotHost();
         _;
     }
 
-    constructor(address verifier_) EIP712("Houseful", "1") Ownable(msg.sender) {
+    constructor(
+        address verifier_,
+        address usdt_,
+        address swapRouter_,
+        address weth_,
+        uint24 poolFee_
+    ) SaleEscrow(usdt_) EIP712("Houseful", "1") Ownable(msg.sender) {
+        if (usdt_ == address(0) || swapRouter_ == address(0) || weth_ == address(0)) revert ZeroAddress();
+        usdt = usdt_;
+        swapRouter = swapRouter_;
+        weth = weth_;
+        poolFee = poolFee_;
         _setVerifier(verifier_);
     }
 
-    /// @notice Rotates the platform key that signs World ID attestations.
+    receive() external payable {}
+
     function setVerifier(address newVerifier) external onlyOwner {
         _setVerifier(newVerifier);
     }
 
-    /// @notice Creates an event. Every policy field is fixed forever once this returns.
-    /// @return eventId Sequential id starting at 1.
     function createEvent(EventParams calldata p) external returns (uint256 eventId) {
         if (p.capacity == 0) revert InvalidCapacity();
         if (p.saleStart >= p.surrenderCutoff || p.surrenderCutoff > p.endsAt || p.endsAt <= block.timestamp) {
@@ -191,6 +250,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         e.host = msg.sender;
         e.faceValue = p.faceValue;
         e.capacity = p.capacity;
+        e.seated = p.seated;
         e.saleStart = p.saleStart;
         e.surrenderCutoff = p.surrenderCutoff;
         e.endsAt = p.endsAt;
@@ -201,6 +261,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
             msg.sender,
             p.faceValue,
             p.capacity,
+            p.seated,
             p.saleStart,
             p.surrenderCutoff,
             p.endsAt,
@@ -209,12 +270,27 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         );
     }
 
-    /// @notice Buys the next unminted seat at exactly face value.
-    /// @param nullifier World ID nullifier hash for this event's action.
-    /// @param deadline Last timestamp at which the attestation is valid.
-    /// @param signature Verifier EIP-712 signature with purpose Buy.
     function buy(
         uint256 eventId,
+        uint32 seat,
+        uint256 nullifier,
+        uint256 deadline,
+        bytes calldata signature
+    ) external nonReentrant returns (uint256 ticketId) {
+        EventData storage e = _existing(eventId);
+        _requireSaleOpen(e);
+        if (e.minted >= e.capacity) revert SoldOut();
+        _admit(eventId, nullifier, Purpose.Buy, deadline, signature);
+        _collectSale(eventId);
+        ticketId = e.minted++;
+        e.sold++;
+        _assign(eventId, ticketId, msg.sender, nullifier, _requireSeat(e, eventId, seat));
+        emit TicketBought(eventId, ticketId, msg.sender, _tickets[eventId][ticketId].seat, nullifier);
+    }
+
+    function buyWithEth(
+        uint256 eventId,
+        uint32 seat,
         uint256 nullifier,
         uint256 deadline,
         bytes calldata signature
@@ -223,16 +299,30 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         _requireSaleOpen(e);
         if (e.minted >= e.capacity) revert SoldOut();
         _admit(eventId, nullifier, Purpose.Buy, deadline, signature);
-        _collectSale(eventId);
+        _swapEthForFaceValue(e.faceValue);
+        _collectSaleFromBalance(eventId);
         ticketId = e.minted++;
         e.sold++;
-        _assign(eventId, ticketId, msg.sender, nullifier);
-        emit TicketBought(eventId, ticketId, msg.sender, nullifier);
+        _assign(eventId, ticketId, msg.sender, nullifier, _requireSeat(e, eventId, seat));
+        emit TicketBought(eventId, ticketId, msg.sender, _tickets[eventId][ticketId].seat, nullifier);
     }
 
-    /// @notice Joins the public waitlist of a sold-out event by escrowing face value.
-    /// @param signature Verifier EIP-712 signature with purpose Join.
     function joinWaitlist(
+        uint256 eventId,
+        uint256 nullifier,
+        uint256 deadline,
+        bytes calldata signature
+    ) external nonReentrant returns (uint256 position) {
+        EventData storage e = _existing(eventId);
+        if (e.cancelled) revert EventIsCancelled();
+        if (block.timestamp < e.saleStart || block.timestamp >= e.surrenderCutoff) revert WaitlistClosed();
+        if (e.minted < e.capacity || _returnedIds[eventId].length != 0) revert SeatsAvailable();
+        _admit(eventId, nullifier, Purpose.Join, deadline, signature);
+        _collectEscrow(eventId);
+        position = _pushWaiter(eventId, e, nullifier);
+    }
+
+    function joinWaitlistWithEth(
         uint256 eventId,
         uint256 nullifier,
         uint256 deadline,
@@ -243,19 +333,11 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         if (block.timestamp < e.saleStart || block.timestamp >= e.surrenderCutoff) revert WaitlistClosed();
         if (e.minted < e.capacity || _returnedIds[eventId].length != 0) revert SeatsAvailable();
         _admit(eventId, nullifier, Purpose.Join, deadline, signature);
-        _collectEscrow(eventId);
-        Waiter[] storage list = _waitlists[eventId];
-        position = list.length;
-        list.push(Waiter({wallet: msg.sender, active: true, nullifier: nullifier}));
-        _waitPositionPlusOne[eventId][msg.sender] = position + 1;
-        e.waitlistActive++;
-        bytes32 head = keccak256(abi.encode(e.waitlistHead, nullifier, msg.sender));
-        e.waitlistHead = head;
-        emit WaitlistJoined(eventId, position, nullifier, msg.sender, head);
+        _swapEthForFaceValue(e.faceValue);
+        _collectEscrowFromBalance(eventId);
+        position = _pushWaiter(eventId, e, nullifier);
     }
 
-    /// @notice Moves the waitlist cursor past inactive slots so a later surrender does not hit
-    /// `WaitlistBacklog`. Anyone may call this; each call advances at most `WAITLIST_SCAN_LIMIT` slots.
     function advanceWaitlist(uint256 eventId) external {
         EventData storage e = _existing(eventId);
         Waiter[] storage list = _waitlists[eventId];
@@ -266,8 +348,6 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         e.waitlistCursor = cursor;
     }
 
-    /// @notice Leaves the waitlist and refunds the escrowed face value. Works at any time,
-    /// including after cancellation or after the event has ended.
     function leaveWaitlist(uint256 eventId, uint256 position) external nonReentrant {
         _existing(eventId);
         Waiter[] storage list = _waitlists[eventId];
@@ -277,12 +357,9 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         uint256 amount = _refundWaiter(eventId, w);
         _nullifierUsed[eventId][w.nullifier] = false;
         emit WaitlistLeft(eventId, position, msg.sender);
-        _send(msg.sender, amount);
+        _sendUsdt(msg.sender, amount);
     }
 
-    /// @notice Hands a ticket back to the contract for exactly face value. If anyone is waiting,
-    /// the oldest active waiter becomes the owner in this same transaction and their escrow funds
-    /// the refund. Otherwise the seat joins the returned pool.
     function surrender(uint256 eventId, uint256 ticketId) external nonReentrant {
         EventData storage e = _existing(eventId);
         if (e.cancelled) revert EventIsCancelled();
@@ -303,9 +380,10 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
             to = w.wallet;
             _deactivateWaiter(eventId, w);
             _escrowToProceeds(eventId, price);
-            _assign(eventId, ticketId, to, w.nullifier);
+            _assign(eventId, ticketId, to, w.nullifier, t.seat);
             emit WaitlistPromoted(eventId, position, ticketId, to);
         } else {
+            if (t.seat != 0) delete _seatTicketIdPlusOne[eventId][t.seat];
             t.owner = address(0);
             t.nullifier = 0;
             e.sold--;
@@ -314,12 +392,30 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         }
         _debitProceeds(eventId, price);
         emit Surrendered(eventId, ticketId, msg.sender, to, t.generation);
-        _send(msg.sender, price);
+        _sendUsdt(msg.sender, price);
     }
 
-    /// @notice Buys a seat from the returned pool at exactly face value.
-    /// @param signature Verifier EIP-712 signature with purpose Claim.
     function claimReturned(
+        uint256 eventId,
+        uint256 ticketId,
+        uint256 nullifier,
+        uint256 deadline,
+        bytes calldata signature
+    ) external nonReentrant {
+        EventData storage e = _existing(eventId);
+        _requireSaleOpen(e);
+        uint256 indexPlusOne = _returnedIndexPlusOne[eventId][ticketId];
+        if (indexPlusOne == 0) revert NotReturned();
+        _admit(eventId, nullifier, Purpose.Claim, deadline, signature);
+        _collectSale(eventId);
+        _removeReturned(eventId, ticketId, indexPlusOne);
+        e.sold++;
+        uint32 seat = _tickets[eventId][ticketId].seat;
+        _assign(eventId, ticketId, msg.sender, nullifier, seat);
+        emit ReturnedClaimed(eventId, ticketId, msg.sender, seat, nullifier);
+    }
+
+    function claimReturnedWithEth(
         uint256 eventId,
         uint256 ticketId,
         uint256 nullifier,
@@ -331,15 +427,45 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         uint256 indexPlusOne = _returnedIndexPlusOne[eventId][ticketId];
         if (indexPlusOne == 0) revert NotReturned();
         _admit(eventId, nullifier, Purpose.Claim, deadline, signature);
-        _collectSale(eventId);
+        _swapEthForFaceValue(e.faceValue);
+        _collectSaleFromBalance(eventId);
         _removeReturned(eventId, ticketId, indexPlusOne);
         e.sold++;
-        _assign(eventId, ticketId, msg.sender, nullifier);
-        emit ReturnedClaimed(eventId, ticketId, msg.sender, nullifier);
+        uint32 seat = _tickets[eventId][ticketId].seat;
+        _assign(eventId, ticketId, msg.sender, nullifier, seat);
+        emit ReturnedClaimed(eventId, ticketId, msg.sender, seat, nullifier);
     }
 
-    /// @notice Registers the ed25519 public key of the device that shows the rotating door QR.
-    /// Replacing an existing key bumps the generation, so codes from the previous device stop working.
+    function recoverTicket(
+        uint256 eventId,
+        uint256 ticketId,
+        uint256 nullifier,
+        uint256 deadline,
+        bytes calldata signature
+    ) external nonReentrant {
+        _existing(eventId);
+        Ticket storage t = _tickets[eventId][ticketId];
+        if (ticketId >= _events[eventId].minted) revert UnknownTicket(eventId, ticketId);
+        if (t.owner == address(0)) revert UnknownTicket(eventId, ticketId);
+        if (t.nullifier != nullifier) revert WrongNullifier();
+        if (_ticketIdPlusOne[eventId][msg.sender] != 0) revert WalletHasTicket();
+        if (_waitPositionPlusOne[eventId][msg.sender] != 0) revert WalletOnWaitlist();
+        if (block.timestamp > deadline) revert AttestationExpired();
+        bytes32 digest = attestationDigest(eventId, nullifier, msg.sender, Purpose.Recover, deadline);
+        if (_attestationSpent[digest]) revert AttestationSpent();
+        (address signer, ECDSA.RecoverError err, ) = ECDSA.tryRecover(digest, signature);
+        if (err != ECDSA.RecoverError.NoError || signer != verifier) revert InvalidAttestation();
+        _attestationSpent[digest] = true;
+
+        address previous = t.owner;
+        delete _ticketIdPlusOne[eventId][previous];
+        t.owner = msg.sender;
+        t.generation += 1;
+        t.doorKey = bytes32(0);
+        _ticketIdPlusOne[eventId][msg.sender] = ticketId + 1;
+        emit TicketRecovered(eventId, ticketId, msg.sender, t.generation);
+    }
+
     function setDoorKey(uint256 eventId, uint256 ticketId, bytes32 doorKey) external {
         Ticket storage t = _tickets[eventId][ticketId];
         if (t.owner != msg.sender) revert NotTicketOwner();
@@ -348,7 +474,6 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         emit DoorKeySet(eventId, ticketId, msg.sender, doorKey);
     }
 
-    /// @notice Cancels an event before it ends. Holders and active waiters then pull refunds.
     function cancelEvent(uint256 eventId) external onlyHost(eventId) {
         EventData storage e = _events[eventId];
         if (e.cancelled) revert EventIsCancelled();
@@ -357,8 +482,6 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         emit EventCancelled(eventId);
     }
 
-    /// @notice Pulls the face value refund for the caller's ticket or active waitlist slot on a
-    /// cancelled event. Nobody, including the host and the platform, can block it.
     function claimRefund(uint256 eventId) external nonReentrant {
         EventData storage e = _existing(eventId);
         if (!e.cancelled) revert EventNotCancelled();
@@ -368,6 +491,7 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         if (ticketIdPlusOne != 0) {
             Ticket storage t = _tickets[eventId][ticketIdPlusOne - 1];
             delete _ticketIdPlusOne[eventId][msg.sender];
+            if (t.seat != 0) delete _seatTicketIdPlusOne[eventId][t.seat];
             t.owner = address(0);
             t.doorKey = bytes32(0);
             t.generation += 1;
@@ -380,11 +504,9 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
             revert NothingToRefund();
         }
         emit RefundClaimed(eventId, msg.sender, amount);
-        _send(msg.sender, amount);
+        _sendUsdt(msg.sender, amount);
     }
 
-    /// @notice Pays the host face value for every seat held at the end of the event. Waitlist
-    /// escrow is never included.
     function withdrawProceeds(uint256 eventId) external nonReentrant onlyHost(eventId) {
         EventData storage e = _events[eventId];
         if (e.cancelled) revert EventIsCancelled();
@@ -393,40 +515,35 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         e.proceedsWithdrawn = true;
         uint256 amount = _drainProceeds(eventId);
         emit ProceedsWithdrawn(eventId, msg.sender, amount);
-        _send(msg.sender, amount);
+        _sendUsdt(msg.sender, amount);
     }
 
-    /// @notice Tickets cannot be transferred. Use surrender.
     function transferFrom(address, address, uint256) external pure {
         revert SurrenderOnly();
     }
 
-    /// @notice Tickets cannot be transferred. Use surrender.
     function safeTransferFrom(address, address, uint256) external pure {
         revert SurrenderOnly();
     }
 
-    /// @notice Tickets cannot be transferred. Use surrender.
     function safeTransferFrom(address, address, uint256, bytes calldata) external pure {
         revert SurrenderOnly();
     }
 
-    /// @notice Tickets cannot be approved for transfer. Use surrender.
     function approve(address, uint256) external pure {
         revert SurrenderOnly();
     }
 
-    /// @notice Tickets cannot be approved for transfer. Use surrender.
     function setApprovalForAll(address, bool) external pure {
         revert SurrenderOnly();
     }
 
-    /// @notice Full event policy and live counters.
     function getEventInfo(uint256 eventId) external view returns (EventView memory v) {
         EventData storage e = _existing(eventId);
         v.host = e.host;
         v.faceValue = e.faceValue;
         v.capacity = e.capacity;
+        v.seated = e.seated;
         v.saleStart = e.saleStart;
         v.surrenderCutoff = e.surrenderCutoff;
         v.endsAt = e.endsAt;
@@ -443,30 +560,35 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         v.proceedsWithdrawn = e.proceedsWithdrawn;
     }
 
-    /// @notice Ticket state. `generation` increases on every surrender, refund or door key change and revokes older
-    /// door credentials. A zero owner means the seat is in the returned pool or was refunded.
     function getTicket(
         uint256 eventId,
         uint256 ticketId
-    ) external view returns (address owner, uint256 nullifier, uint256 generation, bytes32 doorKey) {
+    ) external view returns (address owner, uint256 nullifier, uint256 generation, bytes32 doorKey, uint32 seat) {
         if (ticketId >= _existing(eventId).minted) revert UnknownTicket(eventId, ticketId);
         Ticket storage t = _tickets[eventId][ticketId];
-        return (t.owner, t.nullifier, t.generation, t.doorKey);
+        return (t.owner, t.nullifier, t.generation, t.doorKey, t.seat);
     }
 
-    /// @notice The ticket a wallet holds for an event, if any.
+    function seatsTaken(uint256 eventId, uint32 fromSeat, uint32 count) external view returns (bool[] memory flags) {
+        EventData storage e = _existing(eventId);
+        flags = new bool[](count);
+        for (uint32 i = 0; i < count; i++) {
+            uint32 seat = fromSeat + i;
+            flags[i] = _seatTicketIdPlusOne[eventId][seat] != 0;
+            if (!e.seated) flags[i] = false;
+        }
+    }
+
     function ticketOf(uint256 eventId, address wallet) external view returns (bool held, uint256 ticketId) {
         uint256 idPlusOne = _ticketIdPlusOne[eventId][wallet];
         return idPlusOne == 0 ? (false, 0) : (true, idPlusOne - 1);
     }
 
-    /// @notice The active waitlist slot a wallet occupies for an event, if any.
     function waitlistPositionOf(uint256 eventId, address wallet) external view returns (bool waiting, uint256 position) {
         uint256 posPlusOne = _waitPositionPlusOne[eventId][wallet];
         return posPlusOne == 0 ? (false, 0) : (true, posPlusOne - 1);
     }
 
-    /// @notice A page of the waitlist in join order, including inactive slots.
     function getWaitlist(uint256 eventId, uint256 offset, uint256 limit) external view returns (Waiter[] memory page) {
         Waiter[] storage list = _waitlists[eventId];
         uint256 len = list.length;
@@ -478,7 +600,6 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         }
     }
 
-    /// @notice Hash chain over every join: head = keccak256(abi.encode(prevHead, nullifier, wallet)).
     function waitlistHead(uint256 eventId) external view returns (bytes32) {
         return _events[eventId].waitlistHead;
     }
@@ -487,12 +608,10 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         return _waitlists[eventId].length;
     }
 
-    /// @notice Seats currently held by a wallet.
     function soldCount(uint256 eventId) external view returns (uint256) {
         return _events[eventId].sold;
     }
 
-    /// @notice Seats in the returned pool, claimable via claimReturned.
     function returnedCount(uint256 eventId) external view returns (uint256) {
         return _returnedIds[eventId].length;
     }
@@ -501,18 +620,15 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         return _returnedIds[eventId];
     }
 
-    /// @notice True while the nullifier holds a ticket or an active waitlist slot for the event.
     function nullifierUsed(uint256 eventId, uint256 nullifier) external view returns (bool) {
         return _nullifierUsed[eventId][nullifier];
     }
 
-    /// @notice ETH backing held seats (`proceeds`) and waitlist deposits (`escrow`) for an event.
     function ledger(uint256 eventId) external view returns (uint256 proceeds, uint256 escrow) {
         Ledger memory l = _ledger(eventId);
         return (l.proceeds, l.escrow);
     }
 
-    /// @notice EIP-712 digest the verifier signs for an attestation.
     function attestationDigest(
         uint256 eventId,
         uint256 nullifier,
@@ -546,6 +662,16 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         if (block.timestamp < e.saleStart || block.timestamp >= e.endsAt) revert SaleNotOpen();
     }
 
+    function _requireSeat(EventData storage e, uint256 eventId, uint32 seat) private view returns (uint32) {
+        if (!e.seated) {
+            if (seat != 0) revert InvalidSeat(seat);
+            return 0;
+        }
+        if (seat == 0 || seat > e.capacity) revert InvalidSeat(seat);
+        if (_seatTicketIdPlusOne[eventId][seat] != 0) revert SeatTaken(seat);
+        return seat;
+    }
+
     function _admit(
         uint256 eventId,
         uint256 nullifier,
@@ -565,12 +691,25 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         _nullifierUsed[eventId][nullifier] = true;
     }
 
-    function _assign(uint256 eventId, uint256 ticketId, address owner, uint256 nullifier) private {
+    function _assign(uint256 eventId, uint256 ticketId, address owner, uint256 nullifier, uint32 seat) private {
         Ticket storage t = _tickets[eventId][ticketId];
         t.owner = owner;
         t.nullifier = nullifier;
         t.doorKey = bytes32(0);
+        t.seat = seat;
         _ticketIdPlusOne[eventId][owner] = ticketId + 1;
+        if (seat != 0) _seatTicketIdPlusOne[eventId][seat] = ticketId + 1;
+    }
+
+    function _pushWaiter(uint256 eventId, EventData storage e, uint256 nullifier) private returns (uint256 position) {
+        Waiter[] storage list = _waitlists[eventId];
+        position = list.length;
+        list.push(Waiter({wallet: msg.sender, active: true, nullifier: nullifier}));
+        _waitPositionPlusOne[eventId][msg.sender] = position + 1;
+        e.waitlistActive++;
+        bytes32 head = keccak256(abi.encode(e.waitlistHead, nullifier, msg.sender));
+        e.waitlistHead = head;
+        emit WaitlistJoined(eventId, position, nullifier, msg.sender, head);
     }
 
     function _nextWaiter(uint256 eventId, EventData storage e) private returns (bool found, uint256 position) {
@@ -604,5 +743,28 @@ contract Houseful is SaleEscrow, EIP712, Ownable2Step, ReentrancyGuard {
         _returnedIndexPlusOne[eventId][lastId] = indexPlusOne;
         ids.pop();
         delete _returnedIndexPlusOne[eventId][ticketId];
+    }
+
+    function _swapEthForFaceValue(uint256 faceValue) private {
+        bytes[] memory data = new bytes[](2);
+        data[0] = abi.encodeWithSelector(
+            ISwapRouter02.exactOutputSingle.selector,
+            ISwapRouter02.ExactOutputSingleParams({
+                tokenIn: weth,
+                tokenOut: usdt,
+                fee: poolFee,
+                recipient: address(this),
+                amountOut: faceValue,
+                amountInMaximum: msg.value,
+                sqrtPriceLimitX96: 0
+            })
+        );
+        data[1] = abi.encodeWithSelector(ISwapRouter02.refundETH.selector);
+        ISwapRouter02(swapRouter).multicall{value: msg.value}(data);
+        uint256 dust = address(this).balance;
+        if (dust > 0) {
+            (bool ok, ) = payable(msg.sender).call{value: dust}("");
+            if (!ok) revert EthTransferFailed();
+        }
     }
 }
