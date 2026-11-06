@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteFooter } from "@/components/site-footer";
@@ -18,14 +19,18 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default async function AccountPage() {
+export default function AccountPage() {
+  return <Suspense fallback={<main id="main" className="px-5 py-16" role="status">Loading account…</main>}><AccountContent /></Suspense>;
+}
+
+async function AccountContent() {
   const session = await requireFan();
   const linked = await listWallets(db, session.account.id);
 
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto w-full max-w-[720px] flex-1 px-5 py-12 md:px-8 md:py-16">
+      <main id="main" className="mx-auto w-full max-w-[720px] flex-1 px-5 py-12 md:px-8 md:py-16">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">Account</p>
         <h1 className="mt-3 font-display text-5xl font-black uppercase leading-none">You</h1>
         <p className="mt-4 text-ink-soft">

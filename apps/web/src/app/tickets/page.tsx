@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { RiseText } from "@/components/motion/reveal";
 import { SiteFooter } from "@/components/site-footer";
@@ -9,7 +10,11 @@ import { cityEventsForWallet } from "@/server/queries";
 
 export const metadata: Metadata = { title: "Your tickets" };
 
-export default async function TicketsPage() {
+export default function TicketsPage() {
+  return <Suspense fallback={<main id="main" className="px-5 py-16" role="status">Loading…</main>}><PageContent /></Suspense>;
+}
+
+async function PageContent() {
   await requireFan("/tickets");
   const events = await cityEventsForWallet("mumbai");
   const onChain: WalletEvent[] = events

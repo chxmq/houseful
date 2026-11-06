@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { HostConsole, type CatalogShow } from "@/components/host/host-console";
 import { RiseText } from "@/components/motion/reveal";
@@ -27,7 +28,11 @@ const promises = [
   },
 ];
 
-export default async function HostPage() {
+export default function HostPage() {
+  return <Suspense fallback={<main id="main" className="px-5 py-16" role="status">Loading account…</main>}><AccountContent /></Suspense>;
+}
+
+async function AccountContent() {
   await requireHost("/host");
   const events = await cityEvents("mumbai");
   const catalog: CatalogShow[] = events
@@ -37,7 +42,7 @@ export default async function HostPage() {
   return (
     <>
       <SiteHeader city={{ slug: "mumbai", name: "Mumbai" }} />
-      <main className="mx-auto w-full max-w-[1320px] flex-1 px-5 pb-24 pt-12 md:px-8 md:pt-16">
+      <main id="main" className="mx-auto w-full max-w-[1320px] flex-1 px-5 pb-24 pt-12 md:px-8 md:pt-16">
         <h1 className="font-display text-[clamp(3.5rem,10vw,8rem)] font-black uppercase leading-[0.82]">
           <RiseText text="Host a show" />
         </h1>

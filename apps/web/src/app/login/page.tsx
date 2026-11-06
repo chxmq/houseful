@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -17,7 +18,11 @@ const reasons: Record<string, string> = {
   "host-account": "That session is a host wallet. Sign in here as a fan.",
 };
 
-export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+export default function LoginPage(props: PageProps<"/login">) {
+  return <Suspense fallback={<main id="main" className="px-5 py-16" role="status">Loading sign in…</main>}><LoginContent {...props} /></Suspense>;
+}
+
+async function LoginContent({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : "/account";
   const reason = typeof params.reason === "string" ? params.reason : undefined;
@@ -28,7 +33,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <>
       <SiteHeader />
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-5 py-16 md:px-8">
+      <main id="main" className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-5 py-16 md:px-8">
         <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted">Fan</p>
         <h1 className="mt-3 font-display text-5xl font-black uppercase leading-none">Sign in</h1>
         <p className="mt-4 max-w-prose text-ink-soft">
