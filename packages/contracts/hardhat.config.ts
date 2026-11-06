@@ -20,6 +20,11 @@ const config: HardhatUserConfig = {
       chainId: 4801,
       accounts: deployerKey ? [deployerKey] : [],
     },
+    unichainSepolia: {
+      url: process.env.UNICHAIN_SEPOLIA_RPC_URL ?? "https://sepolia.unichain.org",
+      chainId: 1301,
+      accounts: deployerKey ? [deployerKey] : [],
+    },
   },
   gasReporter: { enabled: process.env.REPORT_GAS === "true" },
   typechain: { outDir: "typechain-types", target: "ethers-v6" },
