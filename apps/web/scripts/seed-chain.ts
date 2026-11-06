@@ -141,7 +141,7 @@ async function main() {
 
     if (id > existing) {
       const endsAt = BigInt(Math.max(e.endsAt, now + 86_400));
-      const cutoff = BigInt(Math.min(Number(endsAt) - 60, Math.max(e.doorsAt - e.surrenderCutoffHours * 3600, now + 3600)));
+      const cutoff = BigInt(Math.min(Number(endsAt) - 60, Math.max((e.doorsAt || e.startsAt) - e.surrenderCutoffHours * 3600, now + 3600)));
       const receipt = await wait(
         await host.writeContract({
           address: address!,
