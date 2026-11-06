@@ -99,6 +99,25 @@ test.describe("a refused sign-in leaves the fan signed out", () => {
   }
 });
 
+test.describe("a prompt nobody answers", () => {
+  test("the person closes the World prompt, and the fan is told it was cancelled", async ({ page, world }) => {
+    world.hold("waiting", { once: true });
+    await page.goto("/login");
+    await page.getByRole("button", { name: "Sign in with World ID" }).click();
+    const prompt = page.getByRole("dialog");
+    await expect(prompt.getByText("Connect your World ID")).toBeVisible();
+
+    await prompt.getByRole("button", { name: "Close" }).click();
+    await expect(signInMessage(page, "Sign in with World ID")).toHaveText("Sign-in was cancelled.");
+    await expect(page).toHaveURL(/\/login$/);
+    expect((await page.context().cookies()).some((cookie) => cookie.name === "hf_session")).toBe(false);
+
+    // The next prompt is answered, and the fan gets in.
+    await page.getByRole("button", { name: "Sign in with World ID" }).click();
+    await expect(page).toHaveURL(/\/account$/);
+  });
+});
+
 test.describe("a proof that was already used", () => {
   test("replayed after the fan signed out, it is refused because its challenge is spent", async ({ page, world }) => {
     const sentProof = page.waitForRequest((request) => new URL(request.url()).pathname === "/api/account/login");
