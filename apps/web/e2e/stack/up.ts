@@ -172,9 +172,18 @@ export async function startStack(options: StartOptions): Promise<Stack> {
     const deployment = readDeployment();
     say(`contracts deployed, Houseful at ${deployment.address}`);
 
+    const usdt = String(deployment.usdt ?? "");
+    const weth = String(deployment.weth ?? "");
+    const swapRouter = String(deployment.swapRouter ?? "");
+    if (!usdt || !weth || !swapRouter) {
+      throw new Error(`Local deploy at ${deployment.address} is missing usdt/weth/swapRouter in deployments/${CHAIN_ID}.json`);
+    }
     const env = appEnv({
       databaseUrl: `file:${path.join(tmp, "houseful.db")}`,
       contractAddress: deployment.address,
+      usdtAddress: usdt,
+      wethAddress: weth,
+      swapRouterAddress: swapRouter,
       worldRpSigningKey: randomBytes(32).toString("hex"),
       doorIssuerSecretKey: randomBytes(32).toString("hex"),
     });

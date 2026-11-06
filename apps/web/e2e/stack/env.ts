@@ -10,7 +10,8 @@ import { BUILD_DIR_RELATIVE, CHAIN_ID, HARDHAT_KEYS, URLS, WORLD } from "./confi
 
 /** The current environment minus anything that would leak a developer's own setup into the stack. */
 function cleanBaseEnv(): NodeJS.ProcessEnv {
-  const drop = /^(NEXT_PUBLIC_|DATABASE_|WORLD_|ATTESTER_|FAUCET_|DOOR_|VERIFIER_|DEPLOYER_|LOCAL_RPC_URL$|RPC_URL$|CHAIN_ID$|NODE_ENV$|NEXT_DIST_DIR$|PORT$|HOSTNAME$)/;
+  // Drop developer .env.local chain addresses too: a live USDT on 1301 must not leak into Hardhat 31337.
+  const drop = /^(NEXT_PUBLIC_|DATABASE_|WORLD_|ATTESTER_|FAUCET_|DOOR_|VERIFIER_|DEPLOYER_|USDT_|SWAP_ROUTER_|WETH_|QUOTER_|LOCAL_RPC_URL$|RPC_URL$|CHAIN_ID$|NODE_ENV$|NEXT_DIST_DIR$|PORT$|HOSTNAME$)/;
   const env: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined || drop.test(key)) continue;
@@ -38,6 +39,9 @@ export function chainEnv(): NodeJS.ProcessEnv {
 export type AppEnvInput = {
   databaseUrl: string;
   contractAddress: string;
+  usdtAddress: string;
+  wethAddress: string;
+  swapRouterAddress: string;
   /** Throwaway, made fresh for each run. */
   worldRpSigningKey: string;
   /** Throwaway, made fresh for each run. */
@@ -56,6 +60,12 @@ export function appEnv(input: AppEnvInput): NodeJS.ProcessEnv {
     NEXT_PUBLIC_CHAIN_ID: String(CHAIN_ID),
     NEXT_PUBLIC_RPC_URL: URLS.rpc,
     NEXT_PUBLIC_HOUSEFUL_ADDRESS: input.contractAddress,
+    NEXT_PUBLIC_USDT_ADDRESS: input.usdtAddress,
+    NEXT_PUBLIC_WETH_ADDRESS: input.wethAddress,
+    NEXT_PUBLIC_PAY_WITH_ETH: "true",
+    USDT_ADDRESS: input.usdtAddress,
+    WETH_ADDRESS: input.wethAddress,
+    SWAP_ROUTER_ADDRESS: input.swapRouterAddress,
 
     WORLD_APP_ID: WORLD.appId,
     WORLD_RP_ID: WORLD.rpId,
