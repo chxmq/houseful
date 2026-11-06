@@ -10,9 +10,19 @@ export const worldchainSepolia = defineChain({
   testnet: true,
 });
 
+export const unichainSepolia = defineChain({
+  id: 1301,
+  name: "Unichain Sepolia",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: ["https://sepolia.unichain.org"] } },
+  blockExplorers: { default: { name: "Uniscan", url: "https://sepolia.uniscan.xyz" } },
+  testnet: true,
+});
+
 const chains: Record<number, Chain> = {
   [hardhat.id]: hardhat,
   [worldchainSepolia.id]: worldchainSepolia,
+  [unichainSepolia.id]: unichainSepolia,
 };
 
 export const chainId = Number(process.env.NEXT_PUBLIC_CHAIN_ID || hardhat.id);

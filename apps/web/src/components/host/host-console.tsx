@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { deviceWallet } from "@/lib/device-wallet";
-import { formatEth, formatUsdt, formatLongDate, shortHex } from "@/lib/format";
+import { formatUsdt, formatLongDate, shortHex } from "@/lib/format";
 import { cancelShow, hostedShows, withdrawProceeds, type HostedShow } from "@/lib/host-actions";
 import { explainError } from "@/lib/ticket-actions";
 import { PlusIcon } from "../icons";
@@ -125,7 +125,11 @@ function HostedRow({
           <Stat label="Waiting" value={String(show.waitlistActive)} />
           <Stat
             label={ended ? "Proceeds" : "Proceeds at the end"}
-            value={meta ? formatUsdt(meta.priceUsd * held) : formatEth(proceeds)}
+            value={
+              meta
+                ? formatUsdt(meta.priceUsd * held)
+                : `${(Number(proceeds) / 1e6).toLocaleString("en-US", { maximumFractionDigits: 0 })} USDT`
+            }
           />
         </dl>
         {error ? <p className="mt-3 text-sm font-medium text-reject">{error}</p> : null}

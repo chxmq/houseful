@@ -92,6 +92,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
               priceUsd: e.priceUsd,
               faceValueUnits: e.faceValueUnits,
               capacity: e.capacity,
+              seated: e.seated,
               sold: e.sold,
               status: e.status,
               startsAt: e.startsAt,

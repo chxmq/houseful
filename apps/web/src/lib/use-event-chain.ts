@@ -15,6 +15,7 @@ export type EventChainState = {
   cancelled: boolean;
   surrenderCutoff: number;
   faceValue: bigint;
+  seated: boolean;
   mine: { ticketId: number | null; waitlistPosition: number | null };
   wallet: `0x${string}`;
 };
@@ -49,6 +50,7 @@ export function useEventChain(chainEventId: number | null, pollMs = 4000) {
         cancelled: info.cancelled,
         surrenderCutoff: Number(info.surrenderCutoff),
         faceValue: info.faceValue,
+        seated: info.seated,
         mine: {
           ticketId: held[0] ? Number(held[1]) : null,
           waitlistPosition: waiting[0] ? Number(waiting[1]) : null,

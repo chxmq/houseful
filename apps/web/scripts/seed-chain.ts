@@ -1,5 +1,13 @@
 import "./load-env";
-import { attestationDomain, attestationPrimaryType, attestationTypes, housefulAbi, housefulAddress } from "@houseful/contracts";
+import {
+  attestationDomain,
+  attestationPrimaryType,
+  attestationTypes,
+  housefulAbi,
+  housefulAddress,
+  usdtAbi,
+  usdtAddress,
+} from "@houseful/contracts";
 import { asc, isNotNull } from "drizzle-orm";
 import { createPublicClient, createWalletClient, http, parseEther, parseEventLogs, type Hex } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -8,12 +16,8 @@ import { db } from "../src/server/db/connection";
 import { events } from "../src/server/db/schema";
 
 /**
- * Lists every Mumbai show from the catalog on the Houseful contract, in chainEventId order.
- *
- * On-chain capacity is the Houseful allocation still for sale. Shows marked sold out are filled by
- * seeded holders so the waitlist can be demonstrated; the flagship keeps one seat so a live buyer can
- * take the last one and a second phone can join the line. The other sold-out shows get a short public
- * waitlist, with one person who left, so the line has history to verify.
+ * Lists every catalog show with a chainEventId on the Houseful contract.
+ * Fans pay in Test USDT (approve then buy / joinWaitlist).
  */
 
 const FLAGSHIP = "the-last-local-nsci-dome";
@@ -24,9 +28,10 @@ const rpc = process.env.RPC_URL ?? activeChain.rpcUrls.default.http[0];
 const hostKey = (process.env.FAUCET_PRIVATE_KEY ?? process.env.DEPLOYER_PRIVATE_KEY) as Hex | undefined;
 const attesterKey = process.env.ATTESTER_PRIVATE_KEY as Hex | undefined;
 const address = (process.env.NEXT_PUBLIC_HOUSEFUL_ADDRESS || housefulAddress(chainId)) as Hex | undefined;
+const usdt = (process.env.NEXT_PUBLIC_USDT_ADDRESS || process.env.USDT_ADDRESS || usdtAddress(chainId)) as Hex | undefined;
 
-if (!hostKey || !attesterKey || !address) {
-  throw new Error("Set FAUCET_PRIVATE_KEY, ATTESTER_PRIVATE_KEY and a Houseful deployment for this chain.");
+if (!hostKey || !attesterKey || !address || !usdt) {
+  throw new Error("Set FAUCET_PRIVATE_KEY, ATTESTER_PRIVATE_KEY, Houseful, and USDT for this chain.");
 }
 
 const publicClient = createPublicClient({ chain: activeChain, transport: http(rpc) });
@@ -39,15 +44,25 @@ async function wait(hash: Hex) {
   return receipt;
 }
 
-async function fundFan(to: `0x${string}`, amount: bigint) {
-  await wait(await host.sendTransaction({ to, value: amount }));
-  // Public RPCs can return the receipt before eth_getBalance / eth_estimateGas see the credit.
+async function fundFan(to: `0x${string}`, eth: bigint, usdtAmount: bigint) {
+  await wait(await host.sendTransaction({ to, value: eth }));
+  await wait(
+    await host.writeContract({
+      address: usdt!,
+      abi: usdtAbi,
+      functionName: "mint",
+      args: [to, usdtAmount],
+    }),
+  );
   for (let i = 0; i < 20; i++) {
-    const bal = await publicClient.getBalance({ address: to });
-    if (bal >= amount) return;
+    const [bal, tokens] = await Promise.all([
+      publicClient.getBalance({ address: to }),
+      publicClient.readContract({ address: usdt!, abi: usdtAbi, functionName: "balanceOf", args: [to] }),
+    ]);
+    if (bal >= eth && tokens >= usdtAmount) return;
     await new Promise((r) => setTimeout(r, 500));
   }
-  throw new Error(`Funded ${to} but balance never reached ${amount}`);
+  throw new Error(`Funded ${to} but balances never settled`);
 }
 
 async function waitForEvent(eventId: bigint) {
@@ -66,10 +81,19 @@ async function waitForEvent(eventId: bigint) {
   throw new Error(`Event #${eventId} not readable after create`);
 }
 
-async function seedFan(eventId: bigint, faceValue: bigint, action: "buy" | "joinWaitlist") {
+async function seedFan(eventId: bigint, faceValue: bigint, action: "buy" | "joinWaitlist", seat = 0) {
   const key = generatePrivateKey();
   const fan = createWalletClient({ account: privateKeyToAccount(key), chain: activeChain, transport: http(rpc) });
-  await fundFan(fan.account.address, faceValue + parseEther("0.0005"));
+  await fundFan(fan.account.address, parseEther("0.01"), faceValue);
+
+  await wait(
+    await fan.writeContract({
+      address: usdt!,
+      abi: usdtAbi,
+      functionName: "approve",
+      args: [address!, faceValue],
+    }),
+  );
 
   const nullifier = BigInt(`0x${Buffer.from(crypto.getRandomValues(new Uint8Array(31))).toString("hex")}`);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 600);
@@ -79,15 +103,26 @@ async function seedFan(eventId: bigint, faceValue: bigint, action: "buy" | "join
     primaryType: attestationPrimaryType,
     message: { eventId, nullifier, wallet: fan.account.address, purpose: action === "buy" ? 1 : 2, deadline },
   });
-  await wait(
-    await fan.writeContract({
-      address: address!,
-      abi: housefulAbi,
-      functionName: action,
-      args: [eventId, nullifier, deadline, signature],
-      value: faceValue,
-    }),
-  );
+
+  if (action === "buy") {
+    await wait(
+      await fan.writeContract({
+        address: address!,
+        abi: housefulAbi,
+        functionName: "buy",
+        args: [eventId, seat, nullifier, deadline, signature],
+      }),
+    );
+  } else {
+    await wait(
+      await fan.writeContract({
+        address: address!,
+        abi: housefulAbi,
+        functionName: "joinWaitlist",
+        args: [eventId, nullifier, deadline, signature],
+      }),
+    );
+  }
   return fan;
 }
 
@@ -101,6 +136,7 @@ async function main() {
     const soldOut = e.status === "sold_out";
     const capacity = BigInt(soldOut ? SOLD_OUT_ALLOCATION : Math.max(1, e.capacity - e.sold));
     const faceValue = BigInt(e.faceValueUnits);
+    const seated = Boolean(e.seated);
     const holdersWanted = soldOut ? Number(capacity) - (e.id === FLAGSHIP ? 1 : 0) : 0;
 
     if (id > existing) {
@@ -115,6 +151,7 @@ async function main() {
             {
               faceValue,
               capacity,
+              seated,
               saleStart: BigInt(now - 60),
               surrenderCutoff: cutoff,
               endsAt,
@@ -129,7 +166,7 @@ async function main() {
         throw new Error(`Chain id drift: ${e.id} expected #${id}, contract assigned #${created?.args.eventId}`);
       }
       await waitForEvent(id);
-      console.log(`list  #${id} ${e.id}  capacity ${capacity}`);
+      console.log(`list  #${id} ${e.id}  capacity ${capacity}${seated ? " seated" : ""}`);
     } else {
       console.log(`skip  #${id} ${e.id} (already listed)`);
     }
@@ -137,7 +174,10 @@ async function main() {
     if (holdersWanted > 0) {
       const info = await waitForEvent(id);
       const missing = holdersWanted - Number(info.sold);
-      for (let i = 0; i < missing; i++) await seedFan(id, faceValue, "buy");
+      for (let i = 0; i < missing; i++) {
+        const seat = seated ? i + 1 : 0;
+        await seedFan(id, faceValue, "buy", seat);
+      }
       if (missing > 0) console.log(`fill  #${id} ${e.id}  +${missing} holders`);
     }
   }

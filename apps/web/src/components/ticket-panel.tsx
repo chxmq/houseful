@@ -6,18 +6,23 @@ import { useState } from "react";
 import type { Assurance } from "@/lib/assurance";
 import { assuranceCopy } from "@/lib/assurance";
 import { explorerTx } from "@/lib/chain";
-import { formatEth, formatUsdt, formatLongDate } from "@/lib/format";
+import { formatUsdt, formatLongDate } from "@/lib/format";
+import { seatCaption, type SeatId } from "@/lib/seat-layout";
 import {
   buyTicket,
   claimReturnedSeat,
+  deviceSigner,
+  ethPaymentsEnabled,
   explainError,
   joinWaitlist,
   returnedSeat,
+  type PayMethod,
 } from "@/lib/ticket-actions";
 import { useEventChain } from "@/lib/use-event-chain";
 import { ArrowRight, CheckIcon, QueueIcon } from "./icons";
 import { SplitFlap } from "./motion/split-flap";
 import { TicketPrint } from "./motion/ticket-print";
+import { SeatMap } from "./seatmap/seat-map";
 import { TicketStub } from "./ticket-stub";
 import { VerifyHuman, type Attestation, type VerifyFailure } from "./verify-human";
 
@@ -28,6 +33,7 @@ export type TicketPanelEvent = {
   priceUsd: number;
   faceValueUnits: string;
   capacity: number;
+  seated: boolean;
   sold: number;
   status: string;
   startsAt: number;
@@ -39,27 +45,29 @@ type Step = "verify" | "pay" | "bind";
 type Phase =
   | { name: "idle" }
   | { name: "working"; done: Step[]; current: Step }
-  | { name: "bought"; ticketId: number; hash: string }
+  | { name: "bought"; ticketId: number; seat: number; hash: string }
   | { name: "joined"; position: number; hash: string }
   | { name: "failed"; failure: VerifyFailure | { kind: "chain"; message: string } };
 
 const stepLabel: Record<Step, string> = {
   verify: "Checked you are one person",
-  pay: "Paid face value into the contract",
+  pay: "Paid the face value",
   bind: "Bound this phone to the ticket for the door",
 };
 
 export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   const { state, error, refresh } = useEventChain(event.chainEventId);
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
+  const [seat, setSeat] = useState<SeatId | null>(event.seated ? null : 0);
+  const [pay, setPay] = useState<PayMethod>("usdt");
+  const ethOk = ethPaymentsEnabled();
 
   if (event.chainEventId == null) {
     return (
       <div className="mt-8 rounded-[4px] bg-paper-deep p-6">
         <p className="font-display text-3xl font-extrabold uppercase">{formatUsdt(event.priceUsd)}</p>
         <p className="mt-2 max-w-[48ch] text-ink-soft">
-          Houseful is selling tickets in Mumbai first. This show is listed so you can plan, and booking opens here when
-          the host moves their sale over.
+          This show is listed so you can plan. Booking opens here when the host moves their sale over.
         </p>
       </div>
     );
@@ -75,24 +83,33 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   }
 
   const faceValue = BigInt(event.faceValueUnits);
+  const seated = state?.seated ?? event.seated;
   const mode = !state ? null : state.available > 0 ? (state.returned > 0 && state.available === state.returned ? "claim" : "buy") : "join";
   const credential = assuranceCopy[event.assurance];
+  const seatReady = mode === "join" || seat !== null;
 
   async function onVerified(att: Attestation) {
     const chainId = event.chainEventId!;
+    const signer = deviceSigner();
     setPhase({ name: "working", done: ["verify"], current: "pay" });
     try {
       if (mode === "join") {
-        const res = await joinWaitlist(chainId, faceValue, att);
+        const res = await joinWaitlist(signer, chainId, faceValue, att, pay);
         setPhase({ name: "joined", position: res.position, hash: res.hash });
       } else {
+        const chosen = seat ?? 0;
         const returned = mode === "claim" ? await returnedSeat(chainId) : null;
         const progress = () => setPhase({ name: "working", done: ["verify", "pay"], current: "bind" });
         const res =
           returned != null
-            ? await claimReturnedSeat(chainId, returned, faceValue, att).finally(progress)
-            : await buyTicket(chainId, faceValue, att).finally(progress);
-        setPhase({ name: "bought", ticketId: res.ticketId, hash: res.hash });
+            ? await claimReturnedSeat(signer, chainId, returned, faceValue, att, pay).finally(progress)
+            : await buyTicket(signer, chainId, chosen, faceValue, att, pay).finally(progress);
+        setPhase({
+          name: "bought",
+          ticketId: res.ticketId,
+          seat: "seat" in res && typeof res.seat === "number" ? res.seat : chosen,
+          hash: res.hash,
+        });
       }
       refresh();
     } catch (err) {
@@ -106,7 +123,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
         <div>
           <p className="font-display text-[56px] font-black leading-none">{formatUsdt(event.priceUsd)}</p>
           <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-            Paid as {formatEth(faceValue)} on testnet · same price for everyone
+            Paid in test USDT · same price for everyone
           </p>
         </div>
         {state ? (
@@ -151,26 +168,57 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                 </p>
               ) : (
                 <>
-                  <VerifyHuman
-                    eventId={event.id}
-                    wallet={state.wallet}
-                    purpose={mode === "join" ? "join" : mode === "claim" ? "claim" : "buy"}
-                    assurance={event.assurance}
-                    label={
-                      mode === "join"
-                        ? `Verify and join the waitlist`
-                        : mode === "claim"
-                          ? "Verify and take a returned seat"
-                          : "Verify and buy"
-                    }
-                    onVerified={onVerified}
-                    onFailed={(failure) => setPhase({ name: "failed", failure })}
-                  />
-                  <p className="mt-3 text-sm text-muted">
-                    {mode === "join"
-                      ? `You lock ${formatUsdt(event.priceUsd)} now. If a seat comes back, it is yours automatically. Leave any time for a full refund.`
-                      : `World ID ${credential.label} keeps it to one ticket per person. We never see who you are.`}
-                  </p>
+                  {mode !== "join" ? (
+                    <div className="mb-6">
+                      <SeatMap
+                        chainEventId={event.chainEventId!}
+                        capacity={state.capacity}
+                        seated={seated}
+                        value={seat}
+                        onChange={setSeat}
+                      />
+                    </div>
+                  ) : null}
+
+                  {ethOk ? (
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      <PayChoice selected={pay === "usdt"} onClick={() => setPay("usdt")} label="Pay with USDT" />
+                      <PayChoice selected={pay === "eth"} onClick={() => setPay("eth")} label="Pay with ETH" />
+                    </div>
+                  ) : (
+                    <p className="mb-4 text-sm text-ink-soft">You will pay {formatUsdt(event.priceUsd)} in test USDT.</p>
+                  )}
+
+                  {seatReady ? (
+                    <>
+                      <VerifyHuman
+                        eventId={event.id}
+                        wallet={state.wallet}
+                        purpose={mode === "join" ? "join" : mode === "claim" ? "claim" : "buy"}
+                        assurance={event.assurance}
+                        label={
+                          mode === "join"
+                            ? "Verify and join the waitlist"
+                            : mode === "claim"
+                              ? "Verify and take a returned seat"
+                              : seated && seat
+                                ? `Verify and buy ${seatCaption(seat)}`
+                                : "Verify and buy"
+                        }
+                        onVerified={onVerified}
+                        onFailed={(failure) => setPhase({ name: "failed", failure })}
+                      />
+                      <p className="mt-3 text-sm text-muted">
+                        {mode === "join"
+                          ? `You lock ${formatUsdt(event.priceUsd)} now. If a seat comes back, it is yours automatically. Leave any time for a full refund.`
+                          : `World ID ${credential.label} keeps it to one ticket per person. We never see who you are.`}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="rounded-[4px] bg-paper-deep p-4 text-sm text-ink-soft">
+                      Pick a seat above, then you can pay.
+                    </p>
+                  )}
                 </>
               )}
             </motion.div>
@@ -202,7 +250,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                   lines={[
                     { label: "Venue", value: event.venue },
                     { label: "Paid", value: formatUsdt(event.priceUsd) },
-                    { label: "Holder", value: "Verified person" },
+                    { label: "Seat", value: seatCaption(phase.seat) },
                     { label: "Ticket", value: `No. ${String(phase.ticketId + 1).padStart(4, "0")}` },
                   ]}
                   serial={`HSF-${event.chainEventId}-${phase.ticketId}`}
@@ -245,6 +293,20 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+function PayChoice({ selected, onClick, label }: { selected: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-4 py-2 text-sm font-semibold ${
+        selected ? "bg-ink text-paper" : "border border-ink/20 text-ink"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 

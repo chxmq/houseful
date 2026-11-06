@@ -4,21 +4,21 @@ import { parseEventLogs } from "viem";
 import { contractAddress, housefulAbi } from "./contract";
 import { publicClient } from "./device-wallet";
 import { chainParams, type EventDraft } from "./event-draft";
-import { send } from "./ticket-actions";
+import { deviceSigner, send, type ActionSigner } from "./ticket-actions";
 
-export async function createShow(draft: EventDraft) {
+export async function createShow(draft: EventDraft, signer: ActionSigner = deviceSigner()) {
   const block = await publicClient.getBlock();
-  const { hash, receipt } = await send("createEvent", [chainParams(draft, Number(block.timestamp) - 60)]);
+  const { hash, receipt } = await send(signer, "createEvent", [chainParams(draft, Number(block.timestamp) - 60)]);
   const [created] = parseEventLogs({ abi: housefulAbi, logs: receipt.logs, eventName: "EventCreated" });
   return { hash, chainEventId: Number(created.args.eventId) };
 }
 
-export async function cancelShow(chainEventId: number) {
-  return send("cancelEvent", [BigInt(chainEventId)]);
+export async function cancelShow(chainEventId: number, signer: ActionSigner = deviceSigner()) {
+  return send(signer, "cancelEvent", [BigInt(chainEventId)]);
 }
 
-export async function withdrawProceeds(chainEventId: number) {
-  return send("withdrawProceeds", [BigInt(chainEventId)]);
+export async function withdrawProceeds(chainEventId: number, signer: ActionSigner = deviceSigner()) {
+  return send(signer, "withdrawProceeds", [BigInt(chainEventId)]);
 }
 
 export type HostedShow = {
@@ -34,6 +34,7 @@ export type HostedShow = {
   ended: boolean;
   cancelled: boolean;
   proceedsWithdrawn: boolean;
+  seated: boolean;
 };
 
 /** Every show on the contract whose host is `wallet`, newest first. */
@@ -64,5 +65,6 @@ export async function hostedShows(wallet: `0x${string}`): Promise<HostedShow[]> 
       ended: info.endsAt <= block.timestamp,
       cancelled: info.cancelled,
       proceedsWithdrawn: info.proceedsWithdrawn,
+      seated: info.seated,
     }));
 }

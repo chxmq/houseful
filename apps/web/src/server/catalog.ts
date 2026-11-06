@@ -65,6 +65,7 @@ export type EventSummary = {
   endsAt: number;
   priceUsd: number;
   faceValueUnits: string;
+  seated: boolean;
   capacity: number;
   sold: number;
   remaining: number;

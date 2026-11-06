@@ -7,7 +7,15 @@ import { contractAddress, housefulAbi } from "@/lib/contract";
 import { deviceWallet, publicClient } from "@/lib/device-wallet";
 import { deviceDoorKey, doorKeyBytes32 } from "@/lib/door-key";
 import { formatUsdt, formatLongDate, formatTime, shortHex } from "@/lib/format";
-import { bindDoorKey, claimRefund, explainError, leaveWaitlist, surrenderTicket } from "@/lib/ticket-actions";
+import { seatCaption } from "@/lib/seat-layout";
+import {
+  bindDoorKey,
+  claimRefund,
+  deviceSigner,
+  explainError,
+  leaveWaitlist,
+  surrenderTicket,
+} from "@/lib/ticket-actions";
 import { DoorCode } from "./door-code";
 import { ArrowRight, ReturnIcon } from "./icons";
 import { SplitFlap } from "./motion/split-flap";
@@ -24,7 +32,15 @@ export type WalletEvent = {
 };
 
 type Holding =
-  | { kind: "ticket"; event: WalletEvent; ticketId: number; generation: number; door: DoorBinding; cancelled: boolean }
+  | {
+      kind: "ticket";
+      event: WalletEvent;
+      ticketId: number;
+      generation: number;
+      seat: number;
+      door: DoorBinding;
+      cancelled: boolean;
+    }
   | { kind: "waiting"; event: WalletEvent; position: number; ahead: number; cancelled: boolean };
 
 /** Whether the ticket's door key on chain is this phone's key, another phone's, or not set. */
@@ -46,7 +62,7 @@ async function readHoldings(events: WalletEvent[], wallet: `0x${string}`): Promi
       if (!held[0] && !waiting[0]) return null;
       const info = await publicClient.readContract({ address, abi: housefulAbi, functionName: "getEventInfo", args: [id] });
       if (held[0]) {
-        const [, , generation, doorKey] = await publicClient.readContract({
+        const [, , generation, doorKey, seat] = await publicClient.readContract({
           address,
           abi: housefulAbi,
           functionName: "getTicket",
@@ -57,6 +73,7 @@ async function readHoldings(events: WalletEvent[], wallet: `0x${string}`): Promi
           event,
           ticketId: Number(held[1]),
           generation: Number(generation),
+          seat: Number(seat),
           door: doorKey === EMPTY_KEY ? "none" : doorKey.toLowerCase() === myKey ? "here" : "elsewhere",
           cancelled: info.cancelled,
         } satisfies Holding;
@@ -180,7 +197,7 @@ function HeldTicket({
     setBusy(true);
     setError(null);
     try {
-      const res = await surrenderTicket(event.chainEventId, ticketId);
+      const res = await surrenderTicket(deviceSigner(), event.chainEventId, ticketId);
       setResult(
         res.to === "0x0000000000000000000000000000000000000000"
           ? `Refunded ${formatUsdt(event.priceUsd)}. Nobody was waiting, so the seat is back on sale.`
@@ -197,7 +214,7 @@ function HeldTicket({
     setBusy(true);
     setError(null);
     try {
-      await claimRefund(event.chainEventId);
+      await claimRefund(deviceSigner(), event.chainEventId);
       setResult(`${event.title} was cancelled. ${formatUsdt(event.priceUsd)} is back in this phone's wallet.`);
       setTorn(true);
     } catch (err) {
@@ -209,7 +226,7 @@ function HeldTicket({
   async function bind() {
     setBusy(true);
     try {
-      await bindDoorKey(event.chainEventId, ticketId);
+      await bindDoorKey(deviceSigner(), event.chainEventId, ticketId);
       onChanged("This phone is now the key for your ticket.");
     } catch (err) {
       setError(explainError(err));
@@ -230,7 +247,7 @@ function HeldTicket({
           { label: "Venue", value: event.venue },
           { label: "Doors", value: formatTime(event.doorsAt) },
           { label: "Paid", value: formatUsdt(event.priceUsd) },
-          { label: "Holder", value: "Verified person, this phone" },
+          { label: "Seat", value: seatCaption(holding.seat) },
         ]}
         serial={`HSF-${event.chainEventId}-${ticketId} · GEN ${holding.generation}`}
         stub={
@@ -320,8 +337,8 @@ function WaitingSpot({
   async function leave() {
     setBusy(true);
     try {
-      if (holding.cancelled) await claimRefund(event.chainEventId);
-      else await leaveWaitlist(event.chainEventId, position);
+      if (holding.cancelled) await claimRefund(deviceSigner(), event.chainEventId);
+      else await leaveWaitlist(deviceSigner(), event.chainEventId, position);
       onChanged(`You left the waitlist for ${event.title}. ${formatUsdt(event.priceUsd)} is back in your wallet.`);
     } catch (err) {
       setError(explainError(err));

@@ -193,16 +193,26 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
             These go on chain when you list. Nobody can change them afterwards, including you.
           </p>
           <div className="grid gap-5 sm:grid-cols-3">
-            <Field label="Face value, ₹">
+            <Field label="Face value, USDT">
               <NumberInput value={form.priceUsd} onChange={set("priceUsd")} min={0} max={100000} />
             </Field>
-            <Field label="Seats" hint={venue ? `${venue.name} holds ${venue.capacity.toLocaleString("en-IN")}` : undefined}>
+            <Field label="Seats" hint={venue ? `${venue.name} holds ${venue.capacity.toLocaleString("en-US")}` : undefined}>
               <NumberInput value={form.capacity} onChange={set("capacity")} min={1} max={100000} />
             </Field>
             <Field label="Hand-backs close, hours before doors">
               <NumberInput value={form.surrenderCutoffHours} onChange={set("surrenderCutoffHours")} min={0} max={336} />
             </Field>
           </div>
+          <Field label="Seating" group>
+            <div className="flex flex-wrap gap-2">
+              <Choice selected={!form.seated} onClick={() => set("seated")(false)}>
+                General admission
+              </Choice>
+              <Choice selected={form.seated} onClick={() => set("seated")(true)}>
+                Assigned seats
+              </Choice>
+            </div>
+          </Field>
         </Section>
 
         <Section index="04" title="The poster">
@@ -286,6 +296,7 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
           <div className="pl-4">
             <Term name="faceValue" value={terms ? `${terms.faceValue} units` : "…"} note={formatUsdt(form.priceUsd)} />
             <Term name="capacity" value={terms ? String(terms.capacity) : "…"} note="one per verified person" />
+            <Term name="seated" value={terms ? String(terms.seated) : "…"} note={form.seated ? "buyer picks a seat" : "general admission"} />
             <Term
               name="surrenderCutoff"
               value={terms ? String(terms.surrenderCutoff) : "…"}
