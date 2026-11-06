@@ -19,6 +19,11 @@ export const housefulAbi = [
   },
   {
     "inputs": [],
+    "name": "AttestationSpent",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "EthTransferFailed",
     "type": "error"
   },
@@ -185,6 +190,11 @@ export const housefulAbi = [
       }
     ],
     "name": "UnknownTicket",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "WaitlistBacklog",
     "type": "error"
   },
   {
@@ -648,7 +658,33 @@ export const housefulAbi = [
   },
   {
     "inputs": [],
+    "name": "WAITLIST_SCAN_LIMIT",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "acceptOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "eventId",
+        "type": "uint256"
+      }
+    ],
+    "name": "advanceWaitlist",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1623,6 +1659,11 @@ export interface HousefulDeployment {
 }
 
 export const deployments: Record<number, HousefulDeployment> = {
+  "4801": {
+    "address": "0x75a6Cb564AF5A94259238Ef62369E1BC30fDFD5a",
+    "verifier": "0x805d719053f43b96631E8C617B45e41DA085d9F2",
+    "blockNumber": 36722565
+  },
   "31337": {
     "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
     "verifier": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
