@@ -148,3 +148,21 @@ export function WalletIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function CameraIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 7h4l2-3h6l2 3h4v13H3z" />
+      <path d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+    </Icon>
+  );
+}
+
+export function SyncIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M20 11a8 8 0 0 0-14.5-4.5M4 4v3h3" />
+      <path d="M4 13a8 8 0 0 0 14.5 4.5M20 20v-3h-3" />
+    </Icon>
+  );
+}
