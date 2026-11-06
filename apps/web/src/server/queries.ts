@@ -1,5 +1,7 @@
 import { cacheLife, cacheTag } from "next/cache";
+import { connection } from "next/server";
 import * as catalog from "./catalog";
+import type { SearchFilters } from "./search-query";
 
 export async function cities() {
   "use cache";
@@ -53,4 +55,10 @@ export async function host(slug: string) {
   cacheLife("minutes");
   cacheTag("events");
   return catalog.getHost(slug);
+}
+
+/** Request-time results keep local date windows and URL filters current. */
+export async function searchEvents(filters: SearchFilters) {
+  await connection();
+  return catalog.searchEvents(filters);
 }

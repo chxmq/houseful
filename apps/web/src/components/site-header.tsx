@@ -21,7 +21,7 @@ export function SiteHeader({ city }: SiteHeaderProps) {
   const base = city ? `/${city.slug}` : "/mumbai";
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-sm focus:text-paper"
@@ -46,6 +46,7 @@ export function SiteHeader({ city }: SiteHeaderProps) {
         ) : null}
 
         <nav className="ml-auto flex items-center gap-1 text-sm font-medium">
+          <Link href={city ? `/search?city=${city.slug}` : "/search"} className="px-3 py-2">Find shows</Link>
           <Link href={base} className="hidden px-3 py-2 sm:block">
             What&apos;s on
           </Link>
@@ -54,7 +55,7 @@ export function SiteHeader({ city }: SiteHeaderProps) {
           </Link>
           <Link
             href="/tickets"
-            className="ml-1 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-paper transition-opacity hover:opacity-90"
+            className="ml-1 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-paper"
           >
             <TicketIcon size={16} />
             <span className="sr-only sm:not-sr-only">Your tickets</span>

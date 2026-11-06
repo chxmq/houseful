@@ -6,10 +6,13 @@ import { EventRow, type EventRowData } from "@/components/event-row";
 import { ArrowRight } from "@/components/icons";
 import { Deal, RiseText } from "@/components/motion/reveal";
 import { Stamp } from "@/components/motion/stamp";
+import { SearchForm } from "@/components/search-form";
+import { SearchResults } from "@/components/search-results";
+import { parseSearchParams, searchHref } from "@/server/search-query";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { categoryLabel, formatDayMonth, formatUsdt, formatWeekday } from "@/lib/format";
-import { cities, city as getCity, cityEvents, featured } from "@/server/queries";
+import { cities, city as getCity, cityEvents, featured, searchEvents } from "@/server/queries";
 
 export async function generateStaticParams() {
   const all = await cities();
@@ -22,10 +25,10 @@ export async function generateMetadata({ params }: PageProps<"/[city]">) {
   return { title: c ? `What's on in ${c.name}` : "City not found" };
 }
 
-export default function CityPage({ params }: PageProps<"/[city]">) {
+export default function CityPage({ params, searchParams }: PageProps<"/[city]">) {
   return (
     <Suspense fallback={<SiteHeader />}>
-      <CityContent params={params} />
+      <CityContent params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
@@ -44,12 +47,16 @@ function groupByWeek(events: EventRowData[]): Grouped[] {
   return [...groups.entries()].map(([label, events]) => ({ label, events }));
 }
 
-async function CityContent({ params }: Pick<PageProps<"/[city]">, "params">) {
+async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, "params" | "searchParams">) {
   const { city: slug } = await params;
   const city = await getCity(slug);
   if (!city) notFound();
 
-  const [events, picks] = await Promise.all([cityEvents(slug), featured(slug)]);
+  const filters = parseSearchParams({ ...await searchParams, city: slug });
+  const filtered = Boolean(filters.q || filters.category || filters.date || filters.maxPrice !== undefined || filters.sort !== "date");
+  const [events, picks, allCities, matches] = await Promise.all([
+    cityEvents(slug), featured(slug), cities(), filtered ? searchEvents(filters) : Promise.resolve([]),
+  ]);
   const upcoming = events.filter((e) => e.status !== "past");
   const houseful = upcoming.filter((e) => e.status === "sold_out");
   const counts = upcoming.reduce<Record<string, number>>((acc, e) => {
@@ -81,6 +88,19 @@ async function CityContent({ params }: Pick<PageProps<"/[city]">, "params">) {
           </nav>
         </section>
 
+        <section className="mx-auto max-w-[1320px] px-5 md:px-8">
+          <h2 className="mb-4 font-display text-3xl font-bold uppercase">Find your next show</h2>
+          <p className="mb-4 text-sm"><Link href={searchHref({ ...filters, city: undefined })} className="underline">Browse all cities</Link></p>
+          <SearchForm key={searchHref(filters)} filters={filters} cities={allCities} action={`/${slug}`} cityOnly />
+        </section>
+        {filtered ? (
+          <div className="mx-auto max-w-[1320px] px-5 md:px-8">
+            <SearchResults events={matches} resetHref={`/${slug}`} allCitiesHref={searchHref({ ...filters, city: undefined })} />
+          </div>
+        ) : <>
+        {upcoming.length === 0 ? (
+          <div className="mx-auto max-w-[1320px] px-5 md:px-8"><SearchResults events={[]} resetHref={`/${slug}`} /></div>
+        ) : null}
         {picks.length > 0 ? (
           <section aria-labelledby="picks" className="pb-16">
             <div className="mx-auto flex max-w-[1320px] items-end justify-between px-5 md:px-8">
@@ -166,6 +186,7 @@ async function CityContent({ params }: Pick<PageProps<"/[city]">, "params">) {
             </div>
           ))}
         </section>
+        </>}
       </main>
 
       <SiteFooter />

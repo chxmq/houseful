@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, eq, gt, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "./db/client";
+import { buildSearchQuery, type SearchFilters } from "./search-query";
 import {
   EVENT_CATEGORIES,
   cities,
@@ -57,7 +58,7 @@ export type EventSummary = {
   category: EventCategory;
   categoryLabel: string;
   citySlug: string;
-  city: { slug: string; name: string };
+  city: { slug: string; name: string; timezone: string };
   venue: { id: string; slug: string; name: string; area: string };
   host: { id: string; slug: string; name: string };
   startsAt: number;
@@ -119,6 +120,7 @@ export function whenWindow(when: When, now: number): { from: number; to: number 
 const eventSelection = {
   event: events,
   cityName: cities.name,
+  cityTimezone: cities.timezone,
   venueSlug: venues.slug,
   venueName: venues.name,
   venueArea: venues.area,
@@ -129,6 +131,7 @@ const eventSelection = {
 type EventRow = {
   event: typeof events.$inferSelect;
   cityName: string;
+  cityTimezone: string;
   venueSlug: string;
   venueName: string;
   venueArea: string;
@@ -152,7 +155,7 @@ function toSummary(row: EventRow): EventSummary {
   const e = row.event;
   return {
     ...baseEvent(e),
-    city: { slug: e.citySlug, name: row.cityName },
+    city: { slug: e.citySlug, name: row.cityName, timezone: row.cityTimezone },
     venue: { id: e.venueId, slug: row.venueSlug, name: row.venueName, area: row.venueArea },
     host: { id: e.hostId, slug: row.hostSlug, name: row.hostName },
   };
@@ -327,3 +330,12 @@ export async function trendingByCategory(
 }
 
 export type { EventCategory, EventStatus, HostKind, PosterInk };
+
+/** Search across the catalog with the same summary shape as city listings. */
+export async function searchEvents(filters: SearchFilters, now = nowSeconds()): Promise<EventSummary[]> {
+  const allCities = await db.select({ slug: cities.slug, timezone: cities.timezone }).from(cities);
+  const query = buildSearchQuery(filters, allCities, now);
+  return (await selectEvents(query.where).orderBy(...query.orderBy))
+    .filter(row => query.matchesText([row.event.title, row.event.subtitle, ...row.event.lineup, row.venueName, row.venueArea, row.hostName]))
+    .map(toSummary);
+}
