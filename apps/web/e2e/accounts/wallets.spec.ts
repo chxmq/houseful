@@ -51,9 +51,8 @@ test.describe("wallets on the account page", () => {
     await choosePay(page, "usdt");
     await buyTicket(page);
 
-    // The show now has one ticket, in some wallet. The account says it pays with the chosen one.
-    const phone = await deviceWalletAddress(page);
-    expect(await chain.read.ticketOf(show.chainEventId, phone)).not.toBeNull();
+    // The show sold its ticket, to some wallet. The account says it pays with the chosen one.
+    expect((await chain.read.ledger(show.chainEventId)).proceeds).toBe(show.price);
     const heldByChosen = (await chain.read.ticketOf(show.chainEventId, chosen.address)) !== null;
     test.fail(
       !heldByChosen,
