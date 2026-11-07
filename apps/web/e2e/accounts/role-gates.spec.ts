@@ -86,34 +86,14 @@ test.describe("signed in as the other role", () => {
     await signInFan(page, world);
     await page.goto("/host");
 
-    // /host/login carries a notice for exactly this case.
-    const notice = page.getByText("That session is a fan World ID. Sign in here with the host wallet.");
-    const shown = await notice.waitFor({ timeout: 5_000 }).then(
-      () => true,
-      () => false,
-    );
-    test.fail(
-      !shown,
-      "A fan on /host is sent to /host/login?reason=fan-account, and that page redirects a signed-in fan to /account before it shows the notice.",
-    );
-    expect(shown, "the notice on the host sign-in page").toBe(true);
+    await expect(page.getByText("That session is a fan World ID. Sign in here with the host wallet.")).toBeVisible();
   });
 
   test("a host sent away from /tickets is told it is a host session", async ({ page }) => {
     await signInHost(page);
     await page.goto("/tickets");
 
-    // /login carries a notice for exactly this case.
-    const notice = page.getByText("That session is a host wallet. Sign in here as a fan.");
-    const shown = await notice.waitFor({ timeout: 5_000 }).then(
-      () => true,
-      () => false,
-    );
-    test.fail(
-      !shown,
-      "A host on /tickets is sent to /login?reason=host-account, and that page redirects a signed-in host to /host before it shows the notice.",
-    );
-    expect(shown, "the notice on the fan sign-in page").toBe(true);
+    await expect(page.getByText("That session is a host wallet. Sign in here as a fan.")).toBeVisible();
   });
 });
 
@@ -127,7 +107,6 @@ test.describe("where sign-in sends you next", () => {
     await page.waitForURL((url) => url.hostname === "evil.example" || url.pathname === "/account");
 
     const stayed = new URL(page.url()).origin === new URL(baseURL!).origin;
-    test.fail(!stayed, "The login page and the sign-in button both send the fan to whatever `next` says, including another site.");
     expect(stayed, `still on the app after signing in with a next that points elsewhere (landed on ${page.url()})`).toBe(true);
   });
 });

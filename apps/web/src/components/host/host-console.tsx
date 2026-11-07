@@ -3,24 +3,23 @@
 import { motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { deviceWallet } from "@/lib/device-wallet";
 import { formatUsdt, formatLongDate, shortHex } from "@/lib/format";
 import { cancelShow, hostedShows, withdrawProceeds, type HostedShow } from "@/lib/host-actions";
+import { hostSigner } from "@/lib/pay-signer";
 import { explainError } from "@/lib/ticket-actions";
 import { PlusIcon } from "../icons";
 import { SplitFlap } from "../motion/split-flap";
 
 export type CatalogShow = { chainEventId: number; slug: string; title: string; startsAt: number; timezone: string; priceUsd: number };
 
-export function HostConsole({ catalog }: { catalog: CatalogShow[] }) {
-  const [wallet, setWallet] = useState<`0x${string}` | null>(null);
+export function HostConsole({ catalog, hostAddress }: { catalog: CatalogShow[]; hostAddress: `0x${string}` }) {
+  const [wallet, setWallet] = useState<`0x${string}` | null>(hostAddress);
   const [shows, setShows] = useState<HostedShow[] | null>(null);
 
   const refresh = useCallback(async () => {
-    const { address } = deviceWallet();
-    setWallet(address);
-    setShows(await hostedShows(address));
-  }, []);
+    setWallet(hostAddress);
+    setShows(await hostedShows(hostAddress));
+  }, [hostAddress]);
 
   useEffect(() => {
     const first = setTimeout(refresh, 0);
@@ -44,12 +43,19 @@ export function HostConsole({ catalog }: { catalog: CatalogShow[] }) {
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Reading the contract</p>
         ) : shows.length === 0 ? (
           <p className="max-w-[52ch] text-ink-soft">
-            Shows listed from this phone appear here, with live sales, the waitlist and your proceeds.
+            Shows listed from the wallet you signed in with appear here, with live sales, the waitlist and your proceeds.
           </p>
         ) : (
           <ul className="border-t-2 border-ink">
             {shows.map((show, i) => (
-              <HostedRow key={show.chainEventId} show={show} meta={byChainId.get(show.chainEventId)} index={i} onChanged={refresh} />
+              <HostedRow
+                key={show.chainEventId}
+                show={show}
+                meta={byChainId.get(show.chainEventId)}
+                index={i}
+                hostAddress={hostAddress}
+                onChanged={refresh}
+              />
             ))}
           </ul>
         )}
@@ -66,11 +72,13 @@ function HostedRow({
   show,
   meta,
   index,
+  hostAddress,
   onChanged,
 }: {
   show: HostedShow;
   meta?: CatalogShow;
   index: number;
+  hostAddress: `0x${string}`;
   onChanged: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -80,11 +88,12 @@ function HostedRow({
   const held = show.sold;
   const proceeds = show.faceValue * BigInt(held);
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(action: (signer: Awaited<ReturnType<typeof hostSigner>>) => Promise<unknown>) {
     setBusy(true);
     setError(null);
     try {
-      await action();
+      const signer = await hostSigner(hostAddress);
+      await action(signer);
       setConfirming(false);
       onChanged();
     } catch (err) {
@@ -142,7 +151,7 @@ function HostedRow({
             <button
               type="button"
               disabled={busy}
-              onClick={() => run(() => withdrawProceeds(show.chainEventId))}
+              onClick={() => run((signer) => withdrawProceeds(show.chainEventId, signer))}
               className="rounded-full bg-admit px-5 py-2.5 text-sm font-semibold text-paper disabled:opacity-60"
             >
               {busy ? "Withdrawing" : "Withdraw proceeds"}
@@ -158,7 +167,7 @@ function HostedRow({
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => run(() => cancelShow(show.chainEventId))}
+                onClick={() => run((signer) => cancelShow(show.chainEventId, signer))}
                 className="rounded-full bg-stamp px-4 py-2 font-semibold text-paper disabled:opacity-60"
               >
                 {busy ? "Cancelling" : "Cancel the show"}

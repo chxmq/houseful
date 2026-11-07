@@ -10,7 +10,7 @@ type SeatMapProps = {
   capacity: number;
   seated: boolean;
   value: SeatId | null;
-  onChange: (seat: SeatId) => void;
+  onChange: (seat: SeatId | null) => void;
   disabled?: boolean;
 };
 
@@ -41,6 +41,12 @@ export function SeatMap({ chainEventId, capacity, seated, value, onChange, disab
       cancelled = true;
     };
   }, [chainEventId, capacity, showMap]);
+
+  useEffect(() => {
+    if (value != null && value > 0 && taken[value - 1] === true) {
+      onChange(null);
+    }
+  }, [taken, value, onChange]);
 
   if (!seated) {
     return (
@@ -108,7 +114,7 @@ export function SeatMap({ chainEventId, capacity, seated, value, onChange, disab
           </div>
         ))}
       </div>
-      {value && value > 0 ? (
+      {value && value > 0 && taken[value - 1] !== true ? (
         <p className="mt-3 text-sm font-semibold">{seatCaption(value)} selected</p>
       ) : null}
       {error ? <p className="mt-2 text-sm font-medium text-reject">{error}</p> : null}

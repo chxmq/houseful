@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { HostWalletLogin } from "@/components/auth/host-wallet-login";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { safeNextPath } from "@/lib/safe-next";
+import { signOutAction } from "@/server/auth/actions";
 import { getSession } from "@/server/auth/session";
 
 export const metadata: Metadata = {
@@ -24,11 +26,12 @@ export default function HostLoginPage(props: PageProps<"/host/login">) {
 
 async function LoginContent({ searchParams }: PageProps<"/host/login">) {
   const params = await searchParams;
-  const next = typeof params.next === "string" ? params.next : "/host";
+  const next = safeNextPath(params.next, "/host");
   const reason = typeof params.reason === "string" ? params.reason : undefined;
   const session = await getSession();
+
   if (session?.account.kind === "host") redirect(next);
-  if (session?.account.kind === "fan") redirect("/account");
+  if (session?.account.kind === "fan" && reason !== "fan-account") redirect("/account");
 
   return (
     <>
@@ -40,9 +43,18 @@ async function LoginContent({ searchParams }: PageProps<"/host/login">) {
           Hosts sign a message with the payout wallet. Fans use World ID on a separate login.
         </p>
         {reason && reasons[reason] ? <p className="mt-4 text-sm font-medium">{reasons[reason]}</p> : null}
-        <div className="mt-8">
-          <HostWalletLogin next={next} />
-        </div>
+        {session?.account.kind === "fan" ? (
+          <form action={signOutAction} className="mt-4">
+            <input type="hidden" name="kind" value="fan" />
+            <button type="submit" className="text-sm font-semibold underline underline-offset-4">
+              Sign out of the fan account first
+            </button>
+          </form>
+        ) : (
+          <div className="mt-8">
+            <HostWalletLogin next={next} />
+          </div>
+        )}
         <p className="mt-8 text-sm text-ink-soft">
           Buying tickets?{" "}
           <Link href="/login" className="font-semibold underline underline-offset-4">

@@ -26,9 +26,9 @@ async function requestTime() {
   return Math.floor(Date.now() / 1000);
 }
 
-async function FormForToday() {
+async function FormForToday({ hostAddress }: { hostAddress: `0x${string}` }) {
   const [now, venues] = await Promise.all([requestTime(), mumbaiVenues()]);
-  return <ShowForm venues={venues} now={now} />;
+  return <ShowForm venues={venues} now={now} hostAddress={hostAddress} />;
 }
 
 export default function NewShowPage() {
@@ -36,7 +36,8 @@ export default function NewShowPage() {
 }
 
 async function PageContent() {
-  await requireHost("/host/new");
+  const session = await requireHost("/host/new");
+  const hostAddress = session.account.id as `0x${string}`;
   return (
     <>
       <SiteHeader city={{ slug: "mumbai", name: "Mumbai" }} />
@@ -50,7 +51,7 @@ async function PageContent() {
         </p>
         <div className="mt-14">
           <Suspense fallback={<p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Loading venues</p>}>
-            <FormForToday />
+            <FormForToday hostAddress={hostAddress} />
           </Suspense>
         </div>
       </main>

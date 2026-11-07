@@ -7,6 +7,7 @@ import { listShow } from "@/app/host/actions";
 import { CATEGORIES, chainParams, draftSchema, INKS, slugify, type EventDraft } from "@/lib/event-draft";
 import { categoryLabel, formatUsdt, formatLongDate, formatTime } from "@/lib/format";
 import { createShow } from "@/lib/host-actions";
+import { hostSigner } from "@/lib/pay-signer";
 import { explainError } from "@/lib/ticket-actions";
 import { EventPoster } from "../event-poster";
 import { CheckIcon } from "../icons";
@@ -32,7 +33,15 @@ function nextSaturdayEvening(now: number) {
 
 type Form = Omit<EventDraft, "slug" | "lineup" | "startsAt"> & { date: string; time: string; lineup: string };
 
-export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }) {
+export function ShowForm({
+  venues,
+  now,
+  hostAddress,
+}: {
+  venues: VenueOption[];
+  now: number;
+  hostAddress: `0x${string}`;
+}) {
   const router = useRouter();
   const [form, setForm] = useState<Form>(() => ({
     title: "",
@@ -100,7 +109,8 @@ export function ShowForm({ venues, now }: { venues: VenueOption[]; now: number }
     }
     try {
       setPhase({ kind: "working", step: 0 });
-      const { hash } = await createShow(parsed.data);
+      const signer = await hostSigner(hostAddress);
+      const { hash } = await createShow(parsed.data, signer);
       setPhase({ kind: "working", step: 1 });
       const listed = await listShow(parsed.data, hash);
       if (!listed.ok) throw new Error(listed.error);

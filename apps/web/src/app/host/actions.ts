@@ -6,6 +6,7 @@ import { parseEventLogs, type Hex } from "viem";
 import { contractAddress, housefulAbi } from "@/lib/contract";
 import { chainParams, draftSchedule, draftSchema, slugify } from "@/lib/event-draft";
 import { usdToUnits } from "@/lib/pricing";
+import { getSession } from "@/server/auth/session";
 import { serverChain } from "@/server/chain";
 import { db } from "@/server/db/client";
 import { events, hosts, venues } from "@/server/db/schema";
@@ -18,6 +19,10 @@ export type ListShowResult = { ok: true; slug: string } | { ok: false; error: st
  * the page the host committed to.
  */
 export async function listShow(input: unknown, txHash: Hex): Promise<ListShowResult> {
+  const session = await getSession();
+  if (session?.account.kind !== "host") {
+    return { ok: false, error: "Sign in as a host to list a show." };
+  }
   const parsed = draftSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Some details on the form are missing or out of range." };
   if (!contractAddress) return { ok: false, error: "Houseful is not deployed on this network." };
@@ -46,6 +51,9 @@ export async function listShow(input: unknown, txHash: Hex): Promise<ListShowRes
   if (!venue) return { ok: false, error: "That venue is not in the guide." };
 
   const wallet = onChain.host.toLowerCase();
+  if (session.account.id !== wallet) {
+    return { ok: false, error: "List shows from the host wallet you signed in with." };
+  }
   const hostId = `wallet-${wallet}`;
   await db
     .insert(hosts)

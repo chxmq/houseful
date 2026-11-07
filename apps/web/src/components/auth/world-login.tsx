@@ -10,6 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { PersonCheckIcon } from "@/components/icons";
+import { safeNextPath } from "@/lib/safe-next";
 
 type WorldRequest = {
   appId: `app_${string}`;
@@ -35,9 +36,33 @@ function messageFor(code: IDKitErrorCodes): string {
     case "timeout":
     case "connection_failed":
       return "World App did not respond in time.";
+    case "nullifier_replayed":
+      return "This World ID proof was already used. Open World App and try again.";
+    case "max_verifications_reached":
+      return "World will not accept another check right now. Try again later.";
+    case "generic_error":
+      return "World could not finish this check. Try again.";
     default:
-      return `World could not verify this request (${code}).`;
+      return "World could not finish this check. Try again.";
   }
+}
+
+function plainServerError(error: string | undefined): string {
+  if (!error) return "Sign-in failed.";
+  if (/nullifier did not match|verified nullifier/i.test(error)) {
+    return "World confirmed a different person than this proof. Try again.";
+  }
+  if (/max_verifications_reached/i.test(error)) {
+    return "World will not accept another check right now. Try again later.";
+  }
+  if (/nullifier_replayed/i.test(error)) {
+    return "This World ID proof was already used. Open World App and try again.";
+  }
+  if (/World is not responding/i.test(error)) return error;
+  if (/^[a-z0-9_]+$/i.test(error.trim())) {
+    return "World could not finish this check. Try again.";
+  }
+  return error;
 }
 
 export function WorldLogin({ next = "/account", label = "Sign in with World ID" }: WorldLoginProps) {
@@ -48,6 +73,7 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
   const [error, setError] = useState<string | null>(null);
   const settled = useRef(false);
   const challenge = useRef("");
+  const destination = safeNextPath(next, "/account");
 
   async function start() {
     setBusy(true);
@@ -65,7 +91,7 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
       settled.current = false;
       setOpen(true);
     } catch (err) {
-      setError((err as Error).message);
+      setError(plainServerError((err as Error).message));
     } finally {
       setBusy(false);
     }
@@ -80,11 +106,11 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error ?? "Sign-in failed.");
+      setError(plainServerError(data.error));
       return;
     }
     setOpen(false);
-    router.replace(next);
+    router.replace(destination);
     router.refresh();
   }
 

@@ -33,11 +33,12 @@ export default function HostPage() {
 }
 
 async function AccountContent() {
-  await requireHost("/host");
+  const session = await requireHost("/host");
   const events = await cityEvents("mumbai");
   const catalog: CatalogShow[] = events
     .filter((e) => e.chainEventId != null)
     .map((e) => ({ chainEventId: e.chainEventId!, slug: e.slug, title: e.title, startsAt: e.startsAt, timezone: e.city.timezone, priceUsd: e.priceUsd }));
+  const hostAddress = session.account.id as `0x${string}`;
 
   return (
     <>
@@ -57,7 +58,7 @@ async function AccountContent() {
         </ol>
         <h2 className="mt-20 font-display text-4xl font-extrabold uppercase leading-none">Your shows</h2>
         <div className="mt-6">
-          <HostConsole catalog={catalog} />
+          <HostConsole catalog={catalog} hostAddress={hostAddress} />
         </div>
       </main>
       <SiteFooter />

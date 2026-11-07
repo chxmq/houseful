@@ -41,12 +41,12 @@ const refusals: Refusal[] = [
   {
     name: "World App reports a proof that was already used",
     arrange: (world) => void world.failWith("nullifier_replayed", { once: true }),
-    message: "World could not verify this request (nullifier_replayed).",
+    message: "This World ID proof was already used. Open World App and try again.",
   },
   {
     name: "World App reports too many verifications",
     arrange: (world) => void world.failWith("max_verifications_reached", { once: true }),
-    message: "World could not verify this request (max_verifications_reached).",
+    message: "World will not accept another check right now. Try again later.",
   },
   {
     name: "World's verify API rejects the proof with a reason",
@@ -56,7 +56,7 @@ const refusals: Refusal[] = [
   {
     name: "World's verify API rejects the proof with a code and no reason",
     arrange: (world, worldVerify) => worldVerify.reject(world.person, { status: 400, code: "max_verifications_reached", detail: null }),
-    message: "max_verifications_reached",
+    message: "World will not accept another check right now. Try again later.",
   },
   {
     name: "World's verify API refuses and says nothing",
@@ -71,7 +71,7 @@ const refusals: Refusal[] = [
   {
     name: "World vouches for a different person than the proof names",
     arrange: (world, worldVerify) => worldVerify.rule(world.person, { kind: "ok", nullifier: randomNullifier() }),
-    message: "The verified nullifier did not match the proof that was submitted.",
+    message: "World confirmed a different person than this proof. Try again.",
   },
 ];
 

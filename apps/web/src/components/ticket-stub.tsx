@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 
 type TicketStubProps = {
   eyebrow: string;
@@ -46,6 +46,11 @@ export function TicketStub({
   const reduce = useReducedMotion();
   const roomToSwing = useRoomToSwing();
   const surface = tone === "ink" ? "bg-ink text-paper" : "bg-paper-deep text-ink";
+
+  // Reduced motion skips the tear animation, so fire the completion callback directly.
+  useEffect(() => {
+    if (torn && reduce) onTornComplete?.();
+  }, [torn, reduce, onTornComplete]);
 
   return (
     <div className="relative flex w-full max-w-[640px] flex-col items-stretch drop-shadow-[0_18px_30px_rgba(20,17,15,0.16)] sm:flex-row">

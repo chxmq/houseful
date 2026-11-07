@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { WorldLogin } from "@/components/auth/world-login";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { safeNextPath } from "@/lib/safe-next";
+import { signOutAction } from "@/server/auth/actions";
 import { getSession } from "@/server/auth/session";
 
 export const metadata: Metadata = {
@@ -24,11 +26,13 @@ export default function LoginPage(props: PageProps<"/login">) {
 
 async function LoginContent({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;
-  const next = typeof params.next === "string" ? params.next : "/account";
+  const next = safeNextPath(params.next, "/account");
   const reason = typeof params.reason === "string" ? params.reason : undefined;
   const session = await getSession();
+
   if (session?.account.kind === "fan") redirect(next);
-  if (session?.account.kind === "host") redirect("/host");
+  // Wrong role: stay so the notice can show, and offer Sign out to switch.
+  if (session?.account.kind === "host" && reason !== "host-account") redirect("/host");
 
   return (
     <>
@@ -40,9 +44,18 @@ async function LoginContent({ searchParams }: PageProps<"/login">) {
           Your World ID is the account. No email, no password. One human, one place to keep tickets and wallets.
         </p>
         {reason && reasons[reason] ? <p className="mt-4 text-sm font-medium">{reasons[reason]}</p> : null}
-        <div className="mt-8">
-          <WorldLogin next={next} />
-        </div>
+        {session?.account.kind === "host" ? (
+          <form action={signOutAction} className="mt-4">
+            <input type="hidden" name="kind" value="host" />
+            <button type="submit" className="text-sm font-semibold underline underline-offset-4">
+              Sign out of the host wallet first
+            </button>
+          </form>
+        ) : (
+          <div className="mt-8">
+            <WorldLogin next={next} />
+          </div>
+        )}
         <p className="mt-8 text-sm text-ink-soft">
           Listing a show?{" "}
           <Link href="/host/login" className="font-semibold underline underline-offset-4">

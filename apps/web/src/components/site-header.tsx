@@ -8,8 +8,8 @@ type SiteHeaderProps = {
 
 export function Wordmark({ className = "" }: { className?: string }) {
   return (
-    <span className={`inline-flex items-center gap-2 font-display text-[28px] font-black uppercase leading-none tracking-[0.02em] ${className}`}>
-      <svg width="26" height="26" viewBox="0 0 64 64" aria-hidden="true">
+    <span className={`inline-flex items-center gap-1.5 font-display text-[22px] font-black uppercase leading-none tracking-[0.02em] sm:gap-2 sm:text-[28px] ${className}`}>
+      <svg className="h-[22px] w-[22px] sm:h-[26px] sm:w-[26px]" viewBox="0 0 64 64" aria-hidden="true">
         <path d="M6 14h52v11a7 7 0 0 0 0 14v11H6V39a7 7 0 0 0 0-14z" fill="#e2401b" />
         <path d="M23 22v20M41 22v20M23 32h18" stroke="#f1ece2" strokeWidth="6" />
       </svg>
@@ -29,8 +29,8 @@ export function SiteHeader({ city }: SiteHeaderProps) {
       >
         Skip to content
       </a>
-      <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-4 px-5 md:gap-6 md:px-8">
-        <Link href={base} aria-label="Houseful home">
+      <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 overflow-x-clip px-4 sm:gap-4 sm:px-5 md:gap-6 md:px-8">
+        <Link href={base} aria-label="Houseful home" className="min-w-0 shrink">
           <Wordmark />
         </Link>
 
@@ -46,9 +46,11 @@ export function SiteHeader({ city }: SiteHeaderProps) {
           </Link>
         ) : null}
 
-        <nav className="ml-auto flex items-center gap-1 text-sm font-medium">
-          <Link href={city ? `/search?city=${city.slug}` : "/search"} className="px-3 py-2">Find shows</Link>
-          <Link href={base} className="hidden px-3 py-2 sm:block">
+        <nav className="ml-auto flex min-w-0 shrink-0 items-center gap-0.5 text-sm font-medium sm:gap-1">
+          <Link href={city ? `/search?city=${city.slug}` : "/search"} className="hidden px-3 py-2 whitespace-nowrap sm:block">
+            Find shows
+          </Link>
+          <Link href={base} className="hidden px-3 py-2 md:block">
             What&apos;s on
           </Link>
           <Link href="/how-it-works" className="hidden px-3 py-2 lg:block">
@@ -56,7 +58,7 @@ export function SiteHeader({ city }: SiteHeaderProps) {
           </Link>
           <Link
             href="/tickets"
-            className="ml-1 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-paper"
+            className="ml-0.5 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-3 py-2 text-paper sm:ml-1 sm:px-4"
           >
             <TicketIcon size={16} />
             <span className="sr-only sm:not-sr-only">Your tickets</span>

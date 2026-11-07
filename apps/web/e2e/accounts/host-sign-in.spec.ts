@@ -26,7 +26,9 @@ test("a host signs in by signing the app's challenge with a wallet", async ({ pa
   expect(injected.requests.map((request) => request.method)).toContain("eth_requestAccounts");
   expect(signing).toHaveLength(1);
   const [signed, signer] = signing[0].params as [Hex, Address];
-  expect(hexToString(signed)).toMatch(/^Houseful host sign-in\nChallenge: [0-9a-f]{48}\nThis proves you control the host wallet\.$/);
+  expect(hexToString(signed)).toMatch(
+    /^Houseful host sign-in\nURI: https?:\/\/[^\n]+\nAddress: 0x[0-9a-f]{40}\nNonce: [0-9a-f]{48}\nIssued At: \S+\nExpiration Time: \S+$/,
+  );
   expect(signer.toLowerCase()).toBe(injected.address.toLowerCase());
 
   // The host account is the wallet, and the menu says "Host console", with no fan account behind it.
@@ -64,17 +66,7 @@ test("another wallet is another host account", async ({ page, device }) => {
 test("the host console says it is hosting as the wallet that signed in", async ({ page }) => {
   const { wallet } = await signInHost(page);
 
-  // The console names the wallet it acts for. After signing in with a wallet, that is the wallet the host signed in with.
-  const named = page.getByText(`Hosting as ${shortAddress(wallet.address)}`);
-  const shown = await named.waitFor({ timeout: 8_000 }).then(
-    () => true,
-    () => false,
-  );
-  test.fail(
-    !shown,
-    "The console names the browser's built-in wallet, and lists and signs with that one. The wallet that signed in only opens the door.",
-  );
-  expect(shown, `"Hosting as ${shortAddress(wallet.address)}" on the host console`).toBe(true);
+  await expect(page.getByText(`Hosting as ${shortAddress(wallet.address)}`)).toBeVisible({ timeout: 8_000 });
 });
 
 test.describe("when the wallet does not sign", () => {
@@ -93,8 +85,9 @@ test.describe("when the wallet does not sign", () => {
 
     injected.rejectNext("personal_sign");
     await page.getByRole("button", { name: "Sign in with wallet" }).click();
-    // The page shows the wallet's own refusal. (It also shows the library's details and version, which this does not pin.)
-    await expect(signInMessage(page, "Sign in with wallet")).toContainText("User rejected the request.");
+    await expect(signInMessage(page, "Sign in with wallet")).toHaveText(
+      "The wallet did not sign. Try again when you are ready.",
+    );
     await expect(page).toHaveURL(/\/host\/login$/);
     expect((await page.context().cookies()).some((cookie) => cookie.name === "hf_session")).toBe(false);
     await page.goto("/host");
@@ -110,7 +103,9 @@ test.describe("when the wallet does not sign", () => {
 
     injected.rejectNext("eth_requestAccounts");
     await page.getByRole("button", { name: "Sign in with wallet" }).click();
-    await expect(signInMessage(page, "Sign in with wallet")).toContainText("User rejected the request.");
+    await expect(signInMessage(page, "Sign in with wallet")).toHaveText(
+      "The wallet did not sign. Try again when you are ready.",
+    );
     expect(injected.requests.some((request) => request.method === "personal_sign")).toBe(false);
     expect((await page.context().cookies()).some((cookie) => cookie.name === "hf_session")).toBe(false);
   });

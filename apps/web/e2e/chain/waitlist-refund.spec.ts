@@ -111,10 +111,6 @@ test.describe("waitlist and USDT refund", () => {
     });
   });
 
-  // The same hand-back with the harness's default of reduced motion. Everything has to work except the notice, which
-  // the wallet page only shows after an animation that reduced motion skips. While that is open this test is marked as
-  // an expected failure, and once it is fixed the mark is not applied and the test passes. Then the tests above and
-  // in cancel-withdraw.spec.ts no longer need to switch motion on.
   test("a hand-back is confirmed on a phone that asks for reduced motion", async ({ device, chain }) => {
     const show = await listShow((await hostPhone(device)).page, chain, { capacity: 1, priceUsd: 6 });
     const holder = await device();
@@ -134,12 +130,8 @@ test.describe("waitlist and USDT refund", () => {
     await expect.poll(() => chain.usdtBalanceOf(holderWallet)).toBe(before + show.price);
     expect(await chain.read.ticketOf(show.chainEventId, holderWallet)).toBeNull();
 
-    const notice = holder.page.getByText("Refunded $6. Nobody was waiting, so the seat is back on sale.");
-    const shown = await notice.waitFor({ timeout: 8_000 }).then(
-      () => true,
-      () => false,
-    );
-    test.fail(!shown, "The wallet page confirms a hand-back from the end of an animation that reduced motion skips.");
-    expect(shown, "the notice that says what the hand-back did").toBe(true);
+    await expect(holder.page.getByText("Refunded $6. Nobody was waiting, so the seat is back on sale.")).toBeVisible({
+      timeout: 8_000,
+    });
   });
 });

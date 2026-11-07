@@ -49,9 +49,9 @@ const reasonCopy: Record<RejectReason, { title: string; detail: string; short: s
     short: "Already in",
   },
   revoked: {
-    title: "Ticket was handed back to the waitlist",
-    detail: "This holder returned the seat. It now belongs to the next person in line.",
-    short: "Handed back",
+    title: "This code was replaced",
+    detail: "A newer code is on the holder's phone now — after a move, a hand-back, or a waitlist promotion. Ask to see the live ticket.",
+    short: "Replaced",
   },
   "wrong-event": {
     title: "Not for this show",

@@ -32,12 +32,16 @@ export const assuranceCopy: Record<Assurance, { label: string; why: string }> = 
   },
 };
 
-export function worldActionFor(eventId: string) {
-  return `ticket:${eventId}`;
-}
-
 /** Single World ID action for fan login. Account id is the nullifier. */
 export const HOUSEFUL_LOGIN_ACTION = "houseful-login";
+
+/**
+ * Checkout uses the same World action as login so one person yields one nullifier.
+ * A per-show action would let the same human buy once signed in and again signed out.
+ */
+export function worldActionFor(_eventId: string) {
+  return HOUSEFUL_LOGIN_ACTION;
+}
 
 export function credentialMeets(have: string, need: Assurance): boolean {
   if (need === "selfie") return have === "selfie" || have === "document" || have === "orb";

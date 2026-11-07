@@ -3,15 +3,28 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createWalletClient, custom, type Hex } from "viem";
+import { safeNextPath } from "@/lib/safe-next";
+import { hostLoginMessage } from "@/lib/host-login-message";
 
 type HostWalletLoginProps = {
   next?: string;
 };
 
+function plainWalletError(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err);
+  if (/user rejected|denied|rejected the request|action_rejected/i.test(text)) {
+    return "The wallet did not sign. Try again when you are ready.";
+  }
+  if (/connect a browser wallet/i.test(text)) return text;
+  if (/no wallet account/i.test(text)) return text;
+  return "Host sign-in failed. Check the wallet and try again.";
+}
+
 export function HostWalletLogin({ next = "/host" }: HostWalletLoginProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const destination = safeNextPath(next, "/host");
 
   async function signIn() {
     setBusy(true);
@@ -28,9 +41,17 @@ export function HostWalletLogin({ next = "/host" }: HostWalletLoginProps) {
       const chalBody = await chal.json();
       if (!chal.ok) throw new Error(chalBody.error ?? "Could not start host sign-in.");
 
+      const message = hostLoginMessage({
+        origin: chalBody.origin as string,
+        address,
+        challenge: chalBody.challenge as string,
+        issuedAt: chalBody.issuedAt as string,
+        expirationTime: chalBody.expirationTime as string,
+      });
+
       const signature = (await client.signMessage({
         account: address,
-        message: chalBody.message as string,
+        message,
       })) as Hex;
 
       const res = await fetch("/api/account/host-login", {
@@ -41,10 +62,10 @@ export function HostWalletLogin({ next = "/host" }: HostWalletLoginProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Host sign-in failed.");
 
-      router.replace(next);
+      router.replace(destination);
       router.refresh();
     } catch (err) {
-      setError((err as Error).message);
+      setError(plainWalletError(err));
     } finally {
       setBusy(false);
     }

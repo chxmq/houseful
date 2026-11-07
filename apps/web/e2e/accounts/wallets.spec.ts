@@ -54,10 +54,6 @@ test.describe("wallets on the account page", () => {
     // The show sold its ticket, to some wallet. The account says it pays with the chosen one.
     expect((await chain.read.ledger(show.chainEventId)).proceeds).toBe(show.price);
     const heldByChosen = (await chain.read.ticketOf(show.chainEventId, chosen.address)) !== null;
-    test.fail(
-      !heldByChosen,
-      "Every purchase is signed by the browser's built-in wallet (deviceSigner in ticket-panel.tsx), whichever wallet the account has chosen.",
-    );
     expect(heldByChosen, "the ticket is held by the wallet the account chose").toBe(true);
   });
 
@@ -96,24 +92,13 @@ test.describe("wallets on the account page", () => {
 
     // The fan presses Delink on the holder. The app words the refusal, and the fan has to see those words.
     const reason = "That wallet still holds a live ticket. Resell at face value or wait until the show ends before delinking.";
-    const answered = page.waitForResponse((res) => res.request().method() === "POST" && new URL(res.url()).pathname === "/account");
     await walletRow(page, holder).getByRole("button", { name: "Delink" }).click();
-    await answered;
-    const shown = await page.getByText(reason).waitFor({ timeout: 5_000 }).then(
-      () => true,
-      () => false,
-    );
+    await expect(page.getByText(reason)).toBeVisible({ timeout: 5_000 });
 
     // Whatever the page said, the delink was refused: the wallet is still linked and still holds the ticket.
     await page.goto("/account");
     await expect(walletRow(page, holder)).toBeVisible();
     await expect(walletRow(page, empty.address)).toBeVisible();
     expect(await chain.read.ticketOf(show.chainEventId, holder)).not.toBeNull();
-
-    test.fail(
-      !shown,
-      "The refusal is thrown from a server action, and in a production build Next hides its text: the fan gets the page that says it could not load.",
-    );
-    expect(shown, `the refusal "${reason}"`).toBe(true);
   });
 });

@@ -3,9 +3,11 @@ import { isAddress, verifyMessage } from "viem";
 import { z } from "zod";
 import { startSession } from "@/server/auth/session";
 import {
+  decodeHostChallenge,
   HOST_CHALLENGE_COOKIE,
   db,
   hostLoginMessage,
+  requestOrigin,
   upsertHostAccount,
 } from "@/server/auth/store";
 
@@ -23,11 +25,23 @@ export async function POST(req: Request) {
   if (!parsed.success) return fail(400, "bad-request", "Sign the host challenge with your wallet.");
 
   const jar = await cookies();
-  const challenge = jar.get(HOST_CHALLENGE_COOKIE)?.value;
-  if (!challenge) return fail(400, "stale-challenge", "Ask for a fresh host challenge.");
+  const payload = decodeHostChallenge(jar.get(HOST_CHALLENGE_COOKIE)?.value);
+  if (!payload) return fail(400, "stale-challenge", "Ask for a fresh host challenge.");
+
+  if (Date.now() > Date.parse(payload.expirationTime)) {
+    jar.delete(HOST_CHALLENGE_COOKIE);
+    return fail(400, "expired-challenge", "That host challenge has expired. Ask for a new one.");
+  }
 
   const address = parsed.data.address.toLowerCase() as `0x${string}`;
-  const message = hostLoginMessage(challenge);
+  const origin = requestOrigin(req);
+  const message = hostLoginMessage({
+    origin,
+    address,
+    challenge: payload.challenge,
+    issuedAt: payload.issuedAt,
+    expirationTime: payload.expirationTime,
+  });
   const ok = await verifyMessage({
     address,
     message,

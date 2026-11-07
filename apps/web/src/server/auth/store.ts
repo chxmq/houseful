@@ -59,8 +59,47 @@ export function fanLoginSignal(challenge: string): string {
   return `houseful:login:${challenge}`;
 }
 
-export function hostLoginMessage(challenge: string): string {
-  return `Houseful host sign-in\nChallenge: ${challenge}\nThis proves you control the host wallet.`;
+/** SIWE-style host challenge: bound to this origin, the signing address, a nonce, and an expiry. */
+export function hostLoginMessage(input: {
+  origin: string;
+  address: string;
+  challenge: string;
+  issuedAt: string;
+  expirationTime: string;
+}): string {
+  return [
+    "Houseful host sign-in",
+    `URI: ${input.origin}`,
+    `Address: ${input.address.toLowerCase()}`,
+    `Nonce: ${input.challenge}`,
+    `Issued At: ${input.issuedAt}`,
+    `Expiration Time: ${input.expirationTime}`,
+  ].join("\n");
+}
+
+export type HostChallengePayload = {
+  challenge: string;
+  issuedAt: string;
+  expirationTime: string;
+};
+
+export function encodeHostChallenge(payload: HostChallengePayload): string {
+  return `${payload.challenge}|${payload.issuedAt}|${payload.expirationTime}`;
+}
+
+export function decodeHostChallenge(raw: string | undefined): HostChallengePayload | null {
+  if (!raw) return null;
+  const [challenge, issuedAt, expirationTime] = raw.split("|");
+  if (!challenge || !issuedAt || !expirationTime) return null;
+  return { challenge, issuedAt, expirationTime };
+}
+
+export function requestOrigin(req: Request): string {
+  const url = new URL(req.url);
+  const forwarded = req.headers.get("x-forwarded-host");
+  const proto = req.headers.get("x-forwarded-proto") ?? url.protocol.replace(":", "");
+  if (forwarded) return `${proto}://${forwarded.split(",")[0]!.trim()}`;
+  return url.origin;
 }
 
 /**

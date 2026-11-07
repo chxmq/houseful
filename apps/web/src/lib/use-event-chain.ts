@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { contractAddress, housefulAbi } from "./contract";
 import { deviceWallet, publicClient } from "./device-wallet";
+import { activePayAddress } from "./pay-signer";
 
 export type EventChainState = {
   capacity: number;
@@ -26,7 +27,8 @@ export function useEventChain(chainEventId: number | null, pollMs = 4000) {
 
   const refresh = useCallback(async () => {
     if (chainEventId == null || !contractAddress) return;
-    const { address } = deviceWallet();
+    const active = await activePayAddress();
+    const address = active ?? deviceWallet().address;
     const id = BigInt(chainEventId);
     try {
       const [info, held, waiting] = await Promise.all([

@@ -1,15 +1,10 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AccountWallets } from "@/components/auth/account-wallets";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
-import { shortHex } from "@/lib/format";
-import {
-  chooseWalletAction,
-  delinkWalletAction,
-  linkWalletAction,
-  signOutAction,
-} from "@/server/auth/actions";
+import { signOutAction } from "@/server/auth/actions";
 import { requireFan } from "@/server/auth/session";
 import { db } from "@/server/db/client";
 import { listWallets } from "@/server/auth/store";
@@ -38,65 +33,7 @@ async function AccountContent() {
           phone.
         </p>
 
-        <section className="mt-12 border-y border-ink/15 py-8">
-          <h2 className="font-display text-2xl font-bold uppercase">Wallets</h2>
-          <p className="mt-2 text-sm text-ink-soft">
-            Link any wallet to pay. Choose which one is active. Delink one that holds no live ticket.
-          </p>
-
-          {linked.length === 0 ? (
-            <p className="mt-5 text-sm">No wallets linked yet. Add the phone wallet or an external one below.</p>
-          ) : (
-            <ul className="mt-5 divide-y divide-ink/10 border-y border-ink/10">
-              {linked.map((wallet) => (
-                <li key={wallet.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
-                  <div>
-                    <p className="font-mono text-sm">{shortHex(wallet.address, 8, 6)}</p>
-                    <p className="mt-1 text-xs text-muted">
-                      {wallet.kind}
-                      {wallet.active ? " · active" : ""}
-                      {wallet.label ? ` · ${wallet.label}` : ""}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {!wallet.active ? (
-                      <form action={chooseWalletAction}>
-                        <input type="hidden" name="walletId" value={wallet.id} />
-                        <button type="submit" className="border border-ink/20 px-3 py-1.5 text-sm">
-                          Use this
-                        </button>
-                      </form>
-                    ) : null}
-                    <form action={delinkWalletAction}>
-                      <input type="hidden" name="walletId" value={wallet.id} />
-                      <button type="submit" className="px-3 py-1.5 text-sm text-ink-soft underline">
-                        Delink
-                      </button>
-                    </form>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <form action={linkWalletAction} className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto]">
-            <input type="hidden" name="kind" value="external" />
-            <label className="min-w-0 text-sm font-medium">
-              Link a wallet address
-              <input
-                name="address"
-                required
-                placeholder="0x…"
-                className="mt-2 block min-h-11 w-full border border-ink/30 bg-paper px-3 py-2 font-mono text-sm"
-              />
-            </label>
-            <div className="flex items-end">
-              <button type="submit" className="min-h-11 bg-ink px-5 py-2 text-sm font-medium text-paper">
-                Link
-              </button>
-            </div>
-          </form>
-        </section>
+        <AccountWallets linked={linked} />
 
         <div className="mt-10 flex flex-wrap gap-5 text-sm">
           <Link href="/tickets" className="underline underline-offset-4">

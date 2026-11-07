@@ -7,12 +7,12 @@ import { contractAddress, housefulAbi } from "@/lib/contract";
 import { deviceWallet, publicClient } from "@/lib/device-wallet";
 import { deviceDoorKey, doorKeyBytes32 } from "@/lib/door-key";
 import { formatUsdt, formatLongDate, formatTime, shortHex } from "@/lib/format";
+import { activePayAddress, paySigner } from "@/lib/pay-signer";
 import { seatCaption } from "@/lib/seat-layout";
 import { playCue } from "@/lib/sounds";
 import {
   bindDoorKey,
   claimRefund,
-  deviceSigner,
   explainError,
   leaveWaitlist,
   surrenderTicket,
@@ -102,7 +102,8 @@ export function TicketWallet({ events }: { events: WalletEvent[] }) {
   const [notice, setNotice] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const { address } = deviceWallet();
+    const active = await activePayAddress();
+    const address = active ?? deviceWallet().address;
     setWallet(address);
     setHoldings(await readHoldings(events, address));
   }, [events]);
@@ -172,7 +173,7 @@ export function TicketWallet({ events }: { events: WalletEvent[] }) {
 
       {wallet ? (
         <p className="mt-16 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
-          This phone&apos;s wallet {shortHex(wallet)}
+          Paying as {shortHex(wallet)}
         </p>
       ) : null}
     </div>
@@ -199,7 +200,8 @@ function HeldTicket({
     setBusy(true);
     setError(null);
     try {
-      const res = await surrenderTicket(deviceSigner(), event.chainEventId, ticketId);
+      const signer = await paySigner();
+      const res = await surrenderTicket(signer, event.chainEventId, ticketId);
       playCue("handback");
       setResult(
         res.to === "0x0000000000000000000000000000000000000000"
@@ -217,7 +219,8 @@ function HeldTicket({
     setBusy(true);
     setError(null);
     try {
-      await claimRefund(deviceSigner(), event.chainEventId);
+      const signer = await paySigner();
+      await claimRefund(signer, event.chainEventId);
       setResult(`${event.title} was cancelled. ${formatUsdt(event.priceUsd)} is back in this phone's wallet.`);
       setTorn(true);
     } catch (err) {
@@ -229,7 +232,8 @@ function HeldTicket({
   async function bind() {
     setBusy(true);
     try {
-      await bindDoorKey(deviceSigner(), event.chainEventId, ticketId);
+      const signer = await paySigner();
+      await bindDoorKey(signer, event.chainEventId, ticketId);
       onChanged("This phone is now the key for your ticket.");
     } catch (err) {
       setError(explainError(err));
@@ -340,8 +344,9 @@ function WaitingSpot({
   async function leave() {
     setBusy(true);
     try {
-      if (holding.cancelled) await claimRefund(deviceSigner(), event.chainEventId);
-      else await leaveWaitlist(deviceSigner(), event.chainEventId, position);
+      const signer = await paySigner();
+      if (holding.cancelled) await claimRefund(signer, event.chainEventId);
+      else await leaveWaitlist(signer, event.chainEventId, position);
       onChanged(`You left the waitlist for ${event.title}. ${formatUsdt(event.priceUsd)} is back in your wallet.`);
     } catch (err) {
       setError(explainError(err));

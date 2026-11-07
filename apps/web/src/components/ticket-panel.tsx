@@ -2,17 +2,17 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Assurance } from "@/lib/assurance";
 import { assuranceCopy } from "@/lib/assurance";
 import { explorerTx } from "@/lib/chain";
 import { formatUsdt, formatLongDate } from "@/lib/format";
 import { seatCaption, type SeatId } from "@/lib/seat-layout";
+import { paySigner } from "@/lib/pay-signer";
 import {
   buyTicket,
   canRetryWithSameAttestation,
   claimReturnedSeat,
-  deviceSigner,
   ethPaymentsEnabled,
   explainError,
   joinWaitlist,
@@ -91,11 +91,18 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   const credential = assuranceCopy[event.assurance];
   const seatReady = mode === "join" || seat !== null;
 
+  // A waitlist promotion on another phone should leave the "joined" panel.
+  useEffect(() => {
+    if (phase.name === "joined" && state?.mine.ticketId != null) {
+      setPhase({ name: "idle" });
+    }
+  }, [phase.name, state?.mine.ticketId]);
+
   async function onVerified(att: Attestation) {
     const chainId = event.chainEventId!;
-    const signer = deviceSigner();
     setPhase({ name: "working", done: ["verify"], current: "pay" });
     try {
+      const signer = await paySigner();
       playCue("verify");
       if (mode === "join") {
         const res = await joinWaitlist(signer, chainId, faceValue, att, pay);
@@ -119,18 +126,23 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
       }
       refresh();
     } catch (err) {
+      const message = explainError(err);
+      if (/Seat .+ was just taken/i.test(message)) setSeat(null);
       setPhase({
         name: "failed",
-        failure: { kind: "chain", message: explainError(err) },
+        failure: { kind: "chain", message },
         attestation: canRetryWithSameAttestation(err) ? att : undefined,
       });
     }
   }
 
   function tryAgain() {
-    if (phase.name === "failed" && phase.attestation) {
-      void onVerified(phase.attestation);
-      return;
+    if (phase.name === "failed") {
+      if (/Seat .+ was just taken/i.test(phase.failure.message)) setSeat(null);
+      if (phase.attestation) {
+        void onVerified(phase.attestation);
+        return;
+      }
     }
     setPhase({ name: "idle" });
   }
@@ -144,7 +156,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
             {formatUsdt(event.priceUsd)}
           </p>
         </div>
-        {state ? (
+        {state && !state.cancelled ? (
           state.available > 0 ? (
             <div className="text-right">
               <SplitFlap value={String(state.available).padStart(3, "0")} className="text-3xl" />
@@ -156,6 +168,8 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
               <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-stamp">in line</p>
             </div>
           )
+        ) : state?.cancelled ? (
+          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-stamp">Cancelled</p>
         ) : (
           <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
             {error ? "Offline" : "Checking seats"}
@@ -179,7 +193,19 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
         <AnimatePresence mode="wait" initial={false}>
           {phase.name === "idle" && state ? (
             <motion.div key="idle" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
-              {state.mine.ticketId != null ? (
+              {state.cancelled ? (
+                state.mine.ticketId != null ? (
+                  <p className="rounded-[4px] bg-paper-deep p-5 text-sm">
+                    This show was cancelled.{" "}
+                    <Link href="/tickets" className="font-semibold underline underline-offset-4">
+                      Claim your refund
+                    </Link>{" "}
+                    from your tickets.
+                  </p>
+                ) : (
+                  <p className="rounded-[4px] bg-paper-deep p-5 text-sm">This show was cancelled. Sales are closed.</p>
+                )
+              ) : state.mine.ticketId != null ? (
                 <Link
                   href="/tickets"
                   className="flex items-center justify-between rounded-full bg-admit px-6 py-4 font-semibold text-paper"
@@ -188,14 +214,6 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                 </Link>
               ) : state.mine.waitlistPosition != null ? (
                 <WaitlistSpot position={state.mine.waitlistPosition} slug={event.id} />
-              ) : state.cancelled ? (
-                <p className="rounded-[4px] bg-paper-deep p-5 text-sm">
-                  This show was cancelled. Claim your refund from{" "}
-                  <Link href="/tickets" className="font-semibold underline underline-offset-4">
-                    your tickets
-                  </Link>
-                  .
-                </p>
               ) : (
                 <>
                   {mode !== "join" ? (

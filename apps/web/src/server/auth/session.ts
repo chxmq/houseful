@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { cache } from "react";
 import { db } from "@/server/db/client";
+import { safeNextPath } from "@/lib/safe-next";
 import {
   createSession,
   deleteSession,
@@ -17,10 +18,10 @@ export type { AccountSummary, SessionSummary } from "./store";
 function loginUrl(kind: "fan" | "host", next?: string, reason?: string): string {
   const path = kind === "host" ? "/host/login" : "/login";
   const params = new URLSearchParams();
-  if (next) params.set("next", next);
+  const dest = safeNextPath(next, kind === "host" ? "/host" : "/account");
+  params.set("next", dest);
   if (reason) params.set("reason", reason);
-  const q = params.toString();
-  return q ? `${path}?${q}` : path;
+  return `${path}?${params.toString()}`;
 }
 
 /**

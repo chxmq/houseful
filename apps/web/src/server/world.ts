@@ -147,17 +147,26 @@ export async function verifyWorldProof(
     throw new WorldVerificationError("world-unreachable", "World is not responding, try again");
   }
   if (!response.ok || body.success !== true) {
-    throw new WorldVerificationError(
-      "rejected-by-world",
-      body.detail ?? body.code ?? `World rejected the proof (HTTP ${response.status}).`,
-    );
+    const code = body.code ?? "";
+    const detail = body.detail?.trim();
+    let message = detail || "World could not finish this check. Try again.";
+    if (!detail) {
+      if (code === "max_verifications_reached") {
+        message = "World will not accept another check right now. Try again later.";
+      } else if (code === "nullifier_replayed") {
+        message = "This World ID proof was already used. Open World App and try again.";
+      } else if (code) {
+        message = "World could not finish this check. Try again.";
+      }
+    }
+    throw new WorldVerificationError("rejected-by-world", message);
   }
 
   const verified = (body.results ?? []).find((r) => r.success === true && typeof r.nullifier === "string");
   if (!verified?.nullifier) {
     throw new WorldVerificationError(
       "rejected-by-world",
-      "World did not return a verified uniqueness nullifier.",
+      "World could not finish this check. Try again.",
     );
   }
 
@@ -165,7 +174,7 @@ export async function verifyWorldProof(
   if (parseNullifier(verified.nullifier) !== parseNullifier(item.nullifier)) {
     throw new WorldVerificationError(
       "rejected-by-world",
-      "The verified nullifier did not match the proof that was submitted.",
+      "World confirmed a different person than this proof. Try again.",
     );
   }
 

@@ -1,14 +1,12 @@
 /**
  * The host's side, driven through the app: sign in as a host, list a show on /host/new, then cancel it or take its
- * proceeds on /host. /host and /host/new open only for a signed-in host, so the page must have gone through
- * `hostPhone` (or `signInHost`) first. The host wallet signs the sign-in message and nothing else: the listing and the
- * host console both use the browser's built-in wallet, which the app's faucet funds.
+ * proceeds on /host. /host and /host/new open only for a signed-in host. Listing and console actions use the same
+ * injected wallet the host signed in with.
  */
 import { randomBytes } from "node:crypto";
 import { expect, type Page } from "@playwright/test";
 import type { Address } from "viem";
 import { signInHost } from "../support/auth";
-import { deviceWalletAddress } from "../support/page";
 import type { Chain, Device } from "../support/fixtures";
 
 export type ShowTerms = {
@@ -43,10 +41,21 @@ function istFields(unixSeconds: number) {
   return { date: iso.slice(0, 10), time: iso.slice(11, 16) };
 }
 
-/** Lists a new show from this page's built-in wallet and returns once the contract and the guide both have it. */
+async function signedInHostAddress(page: Page): Promise<Address> {
+  return page.evaluate(async () => {
+    const eth = (window as unknown as { ethereum?: { request: (args: { method: string }) => Promise<string[]> } }).ethereum;
+    if (!eth) throw new Error("No injected wallet on this page.");
+    const accounts = await eth.request({ method: "eth_accounts" });
+    if (!accounts[0]) throw new Error("The host wallet is not connected.");
+    return accounts[0] as Address;
+  });
+}
+
+/** Lists a new show from the signed-in host wallet and returns once the contract and the guide both have it. */
 export async function listShow(page: Page, chain: Chain, terms: ShowTerms = {}): Promise<ListedShow> {
   const { seated = false, capacity = 10, priceUsd = 8, endsSoon = false } = terms;
   const title = `E2E show ${randomBytes(3).toString("hex")}`;
+  const host = await signedInHostAddress(page);
 
   await page.goto("/host/new");
   await page.getByLabel("Title", { exact: true }).fill(title);
@@ -73,7 +82,6 @@ export async function listShow(page: Page, chain: Chain, terms: ShowTerms = {}):
   await page.waitForURL(/\/e\/[^/]+$/, { timeout: 60_000 });
 
   const slug = new URL(page.url()).pathname.split("/").pop()!;
-  const host = await deviceWalletAddress(page);
   const created = await chain.waitForEvent({
     eventName: "EventCreated",
     where: (log) => log.args.host?.toLowerCase() === host.toLowerCase(),

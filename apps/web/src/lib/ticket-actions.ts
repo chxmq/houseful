@@ -132,9 +132,7 @@ export async function send(
   value = 0n,
 ) {
   const address = requireContract();
-  if (signer.kind === "device") {
-    await ensureFunded(signer.address, value + 2_000_000_000_000_000n);
-  }
+  await ensureFunded(signer.address, value + 2_000_000_000_000_000n);
 
   const { request } = await publicClient.simulateContract({
     account: signer.client.account,
@@ -158,10 +156,6 @@ async function ensureUsdt(signer: ActionSigner, need: bigint) {
     args: [signer.address],
   });
   if (balance >= need) return;
-
-  if (signer.kind !== "device") {
-    throw new Error("This wallet needs funds for the face price. Use a faucet or the Houseful top-up on a device wallet.");
-  }
 
   const res = await fetch("/api/faucet", {
     method: "POST",
