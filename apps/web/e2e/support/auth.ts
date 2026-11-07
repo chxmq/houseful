@@ -41,11 +41,12 @@ async function accountIdFrom(answer: Promise<Response>, what: string): Promise<s
  * test gets a new account. Only this prompt is answered as `person`: later prompts on the phone are answered
  * as the phone's own person again.
  */
-export async function signInFan(page: Page, world: WorldBridge, options: { person?: string | bigint } = {}): Promise<SignedInFan> {
+export async function signInFan(page: Page, world: WorldBridge, options: { person?: string | bigint; method?: "human" | "passport" | "selfie" } = {}): Promise<SignedInFan> {
   const person = options.person === undefined ? world.person : toCanonicalNullifier(options.person);
   if (options.person !== undefined) world.completeAs(person, { once: true });
 
   await page.goto("/login");
+  await page.getByRole("combobox", { name: "Verification method" }).selectOption(options.method ?? "selfie");
   const answer = page.waitForResponse((res) => new URL(res.url()).pathname === "/api/account/login");
   await page.getByRole("button", { name: "Sign in with World ID" }).click();
   const accountId = await accountIdFrom(answer, "World ID sign-in");
