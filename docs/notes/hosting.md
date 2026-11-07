@@ -13,10 +13,6 @@ Vercel Authentication is still on for this team project, so anonymous phone hits
 
 In the Vercel dashboard: Project → Settings → Deployment Protection → turn **Vercel Authentication** off for Production (or set Standard Protection to Preview only).
 
-Optional automation bypass secret already set as `VERCEL_AUTOMATION_BYPASS_SECRET`. After the dashboard toggle matches, you can also open:
-
-`https://houseful-chxmqs-projects.vercel.app/?x-vercel-protection-bypass=houseful-booth-bypass-2026&x-vercel-set-bypass-cookie=true`
-
 ## Redeploy
 
 From `apps/web` after login:
