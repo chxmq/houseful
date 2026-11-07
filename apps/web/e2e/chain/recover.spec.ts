@@ -3,8 +3,9 @@
  *
  * The app's way to do this is on the wallet page: export the wallet on the old phone, import it on the new one, and
  * press "Move it to this phone", which puts the new phone's key on the ticket. The contract also has `recoverTicket`
- * for a brand new wallet proved with World ID, but no page calls it (ticket-actions.ts defines it, and the verify
- * route only signs buy, join and claim), so there is nothing to drive for that.
+ * for a brand new wallet proved with World ID, but no page calls it (ticket-actions.ts defines it, /api/world/verify
+ * only signs buy, join and claim, and /api/attest could sign a recover attestation for a signed-in fan but nothing
+ * asks it to), so there is nothing to drive for that.
  */
 import { signInFan } from "../support/auth";
 import { test, expect } from "../support/fixtures";
