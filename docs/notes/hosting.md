@@ -3,15 +3,12 @@
 ## Live
 
 - Production alias: https://houseful-chxmqs-projects.vercel.app
-- Latest ready deploy: https://houseful-fqig2wh6a-chxmqs-projects.vercel.app
 - Turso DB: `houseful` (`libsql://houseful-chxmq.aws-ap-northeast-1.turso.io`), catalog seeded
 - Unichain 1301 Houseful: `0x8F9A0dfb0BC16526FB4df5d9774ea6D6e2aBa98e`
 
-## Open access (required for phone demo)
+## Open access
 
-Vercel Authentication is still on for this team project, so anonymous phone hits get an SSO redirect.
-
-In the Vercel dashboard: Project → Settings → Deployment Protection → turn **Vercel Authentication** off for Production (or set Standard Protection to Preview only).
+Vercel Authentication is off for Production, so the site opens without a sign-in. The hosted app asks World for its staging environment, so verification works with World's simulator and not with the real World App (see the README).
 
 ## Redeploy
 

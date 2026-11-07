@@ -1,10 +1,10 @@
 # World integration debrief
 
-Evidence: the supplied `submission/world-run-notes.md` record, completed at 04:07 IST on 7 November 2026. This summarizes that run. It does not assert a new live run or a successful purchase.
+Evidence: [the staging run record](../evidence/world-staging-run/world-run-notes.md), completed at 04:07 IST on 7 November 2026. This summarizes that run. It does not assert a new live run or a successful purchase.
 
 ## Time to first success
 
-The first server-verified staging proof succeeded at 03:55:52 IST, about eight minutes after the investigation began. The server returned HTTP 200 after 3.89 seconds. This was a World ID 4.0 Human credential in the staging simulator, not a proof from a physical attendee's real World App.
+The first server-verified staging proof succeeded at 03:55:52 IST, about eight minutes after the staging test run began at 03:47:47. The integration code was written earlier: the first World ID commit is `409e9a1` (6 November, 22:23 IST), and the first live check came 5 hours 32 minutes after it, so the end-to-end time to first success was about five and a half hours. The server returned HTTP 200 after 3.89 seconds. This was a World ID 4.0 Human credential in the staging simulator, not a proof from a physical attendee's real World App.
 
 A completed purchase was not observed. The following USDT approval failed because the public RPC did not support `eth_sendTransaction`; no ticket was minted. From clicking Get tickets to the failure message was 132.1 seconds, including 110.8 seconds before the person approved the prompt. There is no valid time-to-purchase-success measurement.
 
