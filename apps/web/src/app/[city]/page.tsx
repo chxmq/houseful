@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { EventPoster } from "@/components/event-poster";
+import { posterImageFor } from "@/lib/poster-art";
 import { EventRow, type EventRowData } from "@/components/event-row";
 import { ArrowRight } from "@/components/icons";
 import { Deal, RiseText } from "@/components/motion/reveal";
@@ -9,8 +10,10 @@ import { Stamp } from "@/components/motion/stamp";
 import { SearchForm } from "@/components/search-form";
 import { SearchResults } from "@/components/search-results";
 import { parseSearchParams, searchHref } from "@/server/search-query";
+import { CityToggle } from "@/components/city-toggle";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { sortDemoCities } from "@/lib/demo-cities";
 import { categoryLabel, formatDayMonth, formatUsdt, formatWeekday } from "@/lib/format";
 import { cities, city as getCity, cityEvents, featured, searchEvents } from "@/server/queries";
 
@@ -57,6 +60,7 @@ async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, 
   const [events, picks, allCities, matches] = await Promise.all([
     cityEvents(slug), featured(slug), cities(), filtered ? searchEvents(filters) : Promise.resolve([]),
   ]);
+  const demoCities = sortDemoCities(allCities);
   const upcoming = events.filter((e) => e.status !== "past");
   const houseful = upcoming.filter((e) => e.status === "sold_out");
   const counts = upcoming.reduce<Record<string, number>>((acc, e) => {
@@ -69,6 +73,9 @@ async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, 
 
       <main id="main" className="flex-1">
         <section className="mx-auto max-w-[1320px] px-5 pb-10 pt-12 md:px-8 md:pt-20">
+          <div className="mb-8">
+            <CityToggle active={city.slug} />
+          </div>
           <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted">
             {city.name} · {upcoming.length} shows · {houseful.length} sold out with a waitlist
           </p>
@@ -91,7 +98,7 @@ async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, 
         <section className="mx-auto max-w-[1320px] px-5 md:px-8">
           <h2 className="mb-4 font-display text-3xl font-bold uppercase">Find your next show</h2>
           <p className="mb-4 text-sm"><Link href={searchHref({ ...filters, city: undefined })} className="underline">Browse all cities</Link></p>
-          <SearchForm key={searchHref(filters)} filters={filters} cities={allCities} action={`/${slug}`} cityOnly />
+          <SearchForm key={searchHref(filters)} filters={filters} cities={demoCities} action={`/${slug}`} cityOnly />
         </section>
         {filtered ? (
           <div className="mx-auto max-w-[1320px] px-5 md:px-8">
@@ -121,6 +128,7 @@ async function CityContent({ params, searchParams }: Pick<PageProps<"/[city]">, 
                         startsAt={e.startsAt}
                         timezone={e.city.timezone}
                         venue={e.venue.name}
+                        imageSrc={posterImageFor(e.id)}
                         className="rounded-[4px]"
                       />
                       {e.status === "sold_out" ? (

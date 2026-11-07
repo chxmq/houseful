@@ -677,36 +677,37 @@ const eventSeeds: EventSeed[] = [
     surrenderCutoffHours: 24,
   },
   {
-    slug: "twelve-to-twelve-nye-nsci-dome",
+    slug: "devcon-mumbai",
     city: "mumbai",
     venue: "nsci-dome",
     host: "platform-4-live",
-    title: "Twelve to Twelve",
-    subtitle: "New Year's Eve at NSCI Dome",
-    category: "nightlife",
-    start: [2026, 12, 31, 20, 0],
-    doorsBeforeMins: 0,
-    durationMins: 300,
+    title: "Devcon",
+    subtitle: "Ethereum conference · NSCI Dome, Mumbai",
+    category: "workshops",
+    start: [2026, 12, 4, 9, 0],
+    doorsBeforeMins: 60,
+    durationMins: 600,
+    end: [2026, 12, 6, 18, 0],
     priceUsd: 29,
     capacity: 7000,
     sold: 2140,
     status: "on_sale",
     featured: true,
-    ageLimit: 21,
-    language: "English, Hindi",
+    ageLimit: 18,
+    language: "English",
     description: [
-      "New Year's Eve under the Dome, with two DJ sets and a live act through midnight. Kaali Peeli Sound System open, Thar Signal play live from 11 pm into the new year, and Ira Bhattacharya closes.",
-      "The night ends at 1 am. Cabs are hard to find around Worli after midnight on New Year's Eve, so plan your ride home.",
+      "Test listing for a Devcon-style Ethereum conference pass at NSCI Dome. Houseful is not the real Devcon organiser. A booking here is a demo ticket only and does not grant real admission.",
+      "One verified human, one pass. Pay in ETH on Unichain Sepolia; settlement is test USDT through the Uniswap path.",
     ],
-    lineup: ["Kaali Peeli Sound System", "Thar Signal, live", "Ira Bhattacharya"],
+    lineup: ["Devcon", "Ethereum community"],
     highlights: [
-      "21+ with valid photo ID",
-      "Standing floor, no seating",
-      "Last entry 11 pm",
-      "Ends at 1 am",
+      "Demo Devcon pass for the Houseful purchase flow",
+      "Standing floor at NSCI Dome",
+      "One ticket per World ID",
+      "Not affiliated with the real Devcon event",
     ],
     posterVariant: 5,
-    posterInk: "stamp",
+    posterInk: "ink",
     surrenderCutoffHours: 48,
   },
 
@@ -1091,14 +1092,28 @@ function assertCleanCopy(rows: NewEvent[]) {
 }
 
 async function main() {
-  const sampleRows = buildEvents();
+  const { DEMO_CITY_SLUGS } = await import("../src/lib/demo-cities");
+  const keep = new Set<string>(DEMO_CITY_SLUGS);
+
+  const sampleRows = buildEvents().filter((e) => keep.has(e.citySlug));
   const worldwide = buildWorldwideCatalog(catalogDrafts, sampleRows.length + 1);
-  const eventRows = [...sampleRows, ...worldwide.events];
-  const allCities = [...cityRows, ...worldwide.cities.filter(city => !cityRows.some(existing => existing.slug === city.slug))];
+  const worldEvents = worldwide.events.filter((e) => keep.has(e.citySlug));
+  const eventRows = [...sampleRows, ...worldEvents];
+  const allCities = [
+    ...cityRows.filter((c) => keep.has(c.slug)),
+    ...worldwide.cities.filter((city) => keep.has(city.slug) && !cityRows.some((existing) => existing.slug === city.slug)),
+  ];
   assertCleanCopy(eventRows);
 
-  const venueRows: NewVenue[] = [...venueSeeds.map((v) => ({ ...v, id: v.slug })), ...worldwide.venues];
-  const hostRows: NewHost[] = [...hostSeeds.map((h) => ({ ...h, id: h.slug, payoutAddress: null })), ...worldwide.hosts];
+  const venueRows: NewVenue[] = [
+    ...venueSeeds.filter((v) => keep.has(v.citySlug)).map((v) => ({ ...v, id: v.slug })),
+    ...worldwide.venues.filter((v) => keep.has(v.citySlug)),
+  ];
+  const usedHostIds = new Set(eventRows.map((e) => e.hostId));
+  const hostRows: NewHost[] = [
+    ...hostSeeds.filter((h) => usedHostIds.has(h.slug)).map((h) => ({ ...h, id: h.slug, payoutAddress: null })),
+    ...worldwide.hosts.filter((h) => usedHostIds.has(h.id)),
+  ];
 
   for (const row of eventRows) {
     const venue = venueRows.find((v) => v.id === row.venueId);
@@ -1121,7 +1136,7 @@ async function main() {
 
   const mumbai = eventRows.filter((e) => e.citySlug === "mumbai").length;
   console.log(
-    `Seeded ${allCities.length} cities, ${venueRows.length} venues, ${hostRows.length} hosts, ${eventRows.length} events (${mumbai} in Mumbai; ${worldwide.events.length} source-backed test listings; all have chain ids).`,
+    `Seeded ${allCities.length} cities, ${venueRows.length} venues, ${hostRows.length} hosts, ${eventRows.length} events (${mumbai} in Mumbai; ${worldEvents.length} hub listings; demo cities only).`,
   );
 }
 

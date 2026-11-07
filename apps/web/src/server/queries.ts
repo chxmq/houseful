@@ -1,12 +1,13 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { connection } from "next/server";
+import { isDemoCity, sortDemoCities } from "@/lib/demo-cities";
 import * as catalog from "./catalog";
 import type { SearchFilters } from "./search-query";
 
 export async function cities() {
   "use cache";
   cacheLife("hours");
-  return catalog.listCities();
+  return sortDemoCities((await catalog.listCities()).filter((c) => isDemoCity(c.slug)));
 }
 
 export async function city(slug: string) {

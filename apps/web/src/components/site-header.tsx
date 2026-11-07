@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AccountSlot } from "./auth/account-slot";
+import { CityToggle } from "./city-toggle";
 
 type SiteHeaderProps = {
   city?: { slug: string; name: string };
@@ -28,32 +29,18 @@ export function SiteHeader({ city }: SiteHeaderProps) {
       >
         Skip to content
       </a>
-      <div className="mx-auto flex h-16 max-w-[1320px] items-center gap-2 overflow-x-clip px-4 sm:gap-4 sm:px-5 md:gap-6 md:px-8">
-        <Link href={base} aria-label="Houseful home" className="min-w-0 shrink">
+      <div className="mx-auto flex h-14 max-w-[1320px] items-center gap-3 px-4 sm:h-16 sm:gap-4 sm:px-5 md:px-8">
+        <Link href={base} aria-label="Houseful home" className="shrink-0">
           <Wordmark />
         </Link>
 
-        {city ? (
-          <Link
-            href="/cities"
-            className="hidden items-center gap-1.5 border-l border-ink/15 pl-5 font-mono text-xs uppercase tracking-[0.16em] text-ink-soft md:inline-flex"
-          >
-            {city.name}
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-              <path d="M1.5 3.5L5 7l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
-          </Link>
-        ) : null}
+        <div className="min-w-0 flex-1">
+          <CityToggle active={city?.slug} compact />
+        </div>
 
-        <nav className="ml-auto flex min-w-0 shrink-0 items-center gap-0.5 text-sm font-medium sm:gap-1">
-          <Link href={city ? `/search?city=${city.slug}` : "/search"} className="hidden px-3 py-2 whitespace-nowrap sm:block">
-            Find shows
-          </Link>
-          <Link href={base} className="hidden px-3 py-2 md:block">
-            What&apos;s on
-          </Link>
-          <Link href="/how-it-works" className="hidden px-3 py-2 lg:block">
-            How it works
+        <nav className="flex shrink-0 items-center gap-0.5 text-sm font-medium sm:gap-1">
+          <Link href={city ? `/search?city=${city.slug}` : "/search"} className="hidden px-3 py-2 whitespace-nowrap md:block">
+            Find
           </Link>
           <AccountSlot />
         </nav>
