@@ -112,10 +112,10 @@ export default function HowItWorksPage() {
             <li>
               <RuleReveal index={1}>
                 <Link
-                  href="/host"
+                  href="/login"
                   className="flex items-end justify-between gap-6 py-6 font-display text-[clamp(2.75rem,8vw,7rem)] font-black uppercase leading-[0.85] text-ink-soft"
                 >
-                  List a show
+                  Sign in to buy
                   <ArrowRight size={56} className="mb-2 hidden shrink-0 md:block" />
                 </Link>
               </RuleReveal>

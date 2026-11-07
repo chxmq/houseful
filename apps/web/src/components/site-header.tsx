@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { AccountSlot } from "./auth/account-slot";
-import { TicketIcon } from "./icons";
 
 type SiteHeaderProps = {
   city?: { slug: string; name: string };
@@ -55,13 +54,6 @@ export function SiteHeader({ city }: SiteHeaderProps) {
           </Link>
           <Link href="/how-it-works" className="hidden px-3 py-2 lg:block">
             How it works
-          </Link>
-          <Link
-            href="/tickets"
-            className="ml-0.5 inline-flex items-center gap-2 whitespace-nowrap rounded-full bg-ink px-3 py-2 text-paper sm:ml-1 sm:px-4"
-          >
-            <TicketIcon size={16} />
-            <span className="sr-only sm:not-sr-only">Your tickets</span>
           </Link>
           <AccountSlot />
         </nav>

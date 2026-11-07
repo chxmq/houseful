@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { WorldLogin } from "@/components/auth/world-login";
 import { SiteFooter } from "@/components/site-footer";
@@ -56,12 +55,6 @@ async function LoginContent({ searchParams }: PageProps<"/login">) {
             <WorldLogin next={next} />
           </div>
         )}
-        <p className="mt-8 text-sm text-ink-soft">
-          Listing a show?{" "}
-          <Link href="/host/login" className="font-semibold underline underline-offset-4">
-            Host sign in
-          </Link>
-        </p>
       </main>
       <SiteFooter />
     </>
