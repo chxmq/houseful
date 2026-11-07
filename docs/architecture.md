@@ -1,6 +1,6 @@
 # Houseful architecture
 
-Source reviewed through `2fe7b91` on 7 November 2026.
+Source reviewed through `229aeb2` on 7 November 2026.
 
 This describes the current implementation. [The v2 spec](specs/v2.md) is a target, and does not prove that every target flow exists. The [README](../README.md) records demo evidence and pending checks; the [threat model](threat-model.md) describes trust and failure limits.
 
@@ -52,17 +52,17 @@ Search uses URL parameters for text, city, category, date, maximum price and sor
 
 `/tickets` requests past and upcoming rows for every catalog city so expired shows can still expose refund actions. It finds holdings across the catalog, but is not an index of arbitrary chain events. PENDING(wallet-discovery): tickets for uncataloged events still need a discovery path.
 
-The active checkout and ticket-wallet signer remains the generated device wallet. Its private key and the separate ed25519 door key are in localStorage. There is no key export/import UI. `ActionSigner` supports an external signer shape for linked browser wallets.
+Checkout, holdings and ticket actions resolve the account's active wallet through `activePayAddress` and `paySigner`. The matching device key is used locally; another address requires a matching injected-wallet account. With no active linked address, the device wallet is used. Its private key and separate ed25519 door key are in localStorage. There is no key export/import UI. Wallet linking itself still does not prove possession.
 
 ## Accounts and sessions
 
-Fans sign in at `/login` with a World ID Selfie Check using the `houseful-login` action. `POST /api/account/request` stores a random challenge in a ten-minute HttpOnly cookie and returns an RP request. The proof signal is `houseful:login:<challenge>`. `POST /api/account/login` verifies it, records the login, finds or creates a fan account keyed by the verified nullifier, refreshes stored credential metadata and starts a session.
+Fans sign in at `/login` with a selected Human, Passport or Selfie Check request using the `houseful-login` action. Human is the initial choice. Staging renders an explicit simulator launch link for the active connection, including at phone widths. The server still requires v4 proofs; simulator users must select World ID 4.0. `POST /api/account/request` stores a random challenge in a ten-minute HttpOnly cookie and returns an RP request. The proof signal is `houseful:login:<challenge>`. `POST /api/account/login` verifies it, records the login, finds or creates a fan account keyed by the verified nullifier, refreshes stored credential metadata and starts a session.
 
 Hosts sign in at `/host/login` using an injected browser wallet. `/api/account/host-challenge` creates a ten-minute cookie challenge; `/api/account/host-login` verifies a signature over the host sign-in message and creates or finds a host account keyed by the lowercased wallet address. Host login does not require World ID. Both successful login paths delete their challenge cookie. Session tokens are random 32-byte values, stored as SHA-256 hashes in the database, and expire after 30 days. The session cookie is HttpOnly, SameSite Lax, and Secure in production. Sign-in replaces the current browser session; sign-out deletes it.
 
-`/account` and `/tickets` require a fan session; `/host` and `/host/new` require a host session. The `listShow` server action requires a host session and accepts a listing only when the contract recorded the same terms and metadata hash. Wallet-list operations check the session and record ownership, but linking does not challenge the wallet for a signature. Delinking queries `ticketOf` for all catalog chain event ids and refuses if any ticket is held. It does not check event end or cancellation, ignores waitlist places and cannot find uncataloged tickets; without a configured contract it permits removal. Selecting the active record selects the wallet that `paySigner` signs with. PENDING(account-integration): wallet possession and complete action authorization.
+`/account` and `/tickets` require a fan session; `/host` and `/host/new` require a host session. The `listShow` server action requires a host session and accepts a listing only when the contract recorded the same terms and metadata hash. Wallet-list operations check the session and record ownership, but linking does not challenge the wallet for a signature. Delinking queries `ticketOf` for all catalog chain event ids and refuses if any ticket is held. It does not check event end or cancellation, ignores waitlist places and cannot find uncataloged tickets; without a configured contract it permits removal. Selecting the active record now affects checkout and ticket actions through `paySigner`. PENDING(account-integration): wallet possession, precise delink policy and complete action authorization.
 
-The host session proves the external wallet, and `hostSigner` in `pay-signer.ts` signs host transactions with that address, through the injected wallet unless it is the device wallet. The host form and console use it, and that path has not been run live. PENDING(host-signer-integration). Earlier discovery runs do not establish these new authentication or payment paths. PENDING(auth-verification).
+Host forms and console actions use `hostSigner` with the address proved by the host session. The current local follow-up completed fan sign-in, both payment methods and the ticket-code page. Host-wallet switching and the complete browser regression suite remain PENDING; earlier discovery runs do not prove them.
 
 ## Verify, buy and join
 
@@ -76,7 +76,7 @@ The host session proves the external wallet, and `hostSigner` in `pay-signer.ts`
 
 For a sold-out event, join deposits face value into escrow. A returned unowned ticket can be claimed at face value through the claim flow. The event-proof verification API accepts buy, join and claim; the session attestation API also accepts recover. The database retains the first verification row for each action, nullifier and purpose, so it is not a complete append-only record of attempts.
 
-The staging World run established a server verification response, but the subsequent browser USDT approval failed at the public RPC. The transaction and approval simulations now pass `signer.client.account` so the device wallet retains local signing. PENDING(live-purchase): re-run the complete flow against the public RPC. The later second-wallet attempt received World HTTP 502 and did not establish an already-holds refusal. See the README evidence table.
+The staging World run established a server verification response, but the subsequent browser USDT approval failed at the public RPC. The transaction and approval simulations now pass `signer.client.account` so the device wallet retains local signing. The current local follow-up completed test-USDT and ETH purchases after server-verified Human sign-in, with owner, door key and proceeds confirmed. PENDING(live-purchase): the hosted/public-RPC browser flow still needs a complete recorded run. The later second-wallet attempt received World HTTP 502 and did not establish an already-holds refusal. See the README evidence table.
 
 ## Registry rules and money
 
