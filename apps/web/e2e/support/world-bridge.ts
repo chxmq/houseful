@@ -233,13 +233,11 @@ export class WorldBridge {
   private async readKey(request: Request, id: string): Promise<Buffer | undefined> {
     const href = await request
       .frame()
-      .locator(`a[href*="i=${id}"], a[href*="i%3D${id}"]`)
+      .locator(`a[href*="i=${id}"]`)
       .first()
       .getAttribute("href", { timeout: 4000 })
       .catch(() => null);
-    const link = href ? new URL(href) : null;
-    const connection = link?.searchParams.get("connect_url");
-    const key = connection ? new URL(connection).searchParams.get("k") : link?.searchParams.get("k");
+    const key = href ? new URL(href).searchParams.get("k") : null;
     return key ? Buffer.from(key, "base64") : undefined;
   }
 

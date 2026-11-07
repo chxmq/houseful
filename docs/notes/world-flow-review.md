@@ -33,7 +33,7 @@ References: [IDKit integration](https://docs.world.org/world-id/idkit/integrate)
 
 Observed in steps 1 and 2: one sign-in button opens the connection prompt with no method selector. Source: `apps/web/src/components/auth/world-login.tsx:116` always builds `selfieCheck({ signal })`. Checkout separately chooses a preset from the event's assurance policy in `apps/web/src/components/verify-human.tsx`. A real Orb account does not cause sign-in to request an Orb proof automatically.
 
-Fix: expose the supported sign-in methods with their requirements, use the selected credential request, and retain server-side assurance enforcement. Higher-assurance shows must not be weakened by an arbitrary method selector. Check identity continuity when changing credentials; method selection must not create a second account for the same intended identity. The current `world_id_4_not_available` message also incorrectly implies that every such failure means a missing Selfie Check.
+Fix (booth decision): request Proof of Human only—no method picker—so staging matches the simulator Human card. Retain server-side assurance for session reuse. Copy for `world_id_4_not_available` should say World ID 4.0 / Human, not a missing Selfie Check.
 
 Reference: [World credential requests](https://docs.world.org/world-id/idkit/credentials).
 
@@ -69,7 +69,7 @@ Before calling the flow ready, record a successful real-account login, sign-out/
 
 ## Follow-up local implementation and evidence
 
-The clone's current sign-in work addresses WF-02 and WF-04: Human, Passport and Selfie Check can be selected before opening World; the SDK preset matches that choice; version failures are no longer described as missing Selfie Check; backend failures reject the verification callback. A staging-only inline connection panel supplies an Open simulator link on narrow screens as well as desktop. The server continues requiring World ID 4.0. Production retains the standard connection widget.
+Current main addresses WF-02 for the booth path by requesting Proof of Human (simulator Human card) instead of Selfie Check, and keeps version-failure copy honest. There is no credential method picker. The server continues requiring World ID 4.0.
 
 A Human staging sign-in subsequently returned 200 from the app after official World verification, with an Orb credential on the account. Browser purchases on the local chain completed with both test USDT and ETH, and the ticket code page opened. See `local-demo-proof.md`. These observations supersede the earlier absence of local successful completion. WF-01 still describes the separate real-account environment mismatch, and WF-03 remains unresolved.
 

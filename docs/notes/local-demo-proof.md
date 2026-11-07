@@ -6,9 +6,7 @@ This records the interactive run on `http://localhost:3300` with a fresh local c
 
 The official World simulator completed a Human request. The app posted the proof to the official World verification service and `/api/account/login` returned HTTP 200 in 920 ms, including 854 ms of application work. The account page displayed credential `orb` and the signed-in account menu. This timing is the server login response, not the whole interactive verification time.
 
-The sign-in page now lets the person choose Human, Passport or Selfie Check. Human is the initial choice. The request uses the corresponding SDK preset and a server-issued login challenge. The backend still requires World ID 4.0 and rejects Device-only proofs. Presets can carry legacy compatibility metadata; the simulator must remain on World ID 4.0. Choosing a stronger credential does not weaken the server's per-show policy.
-
-A staging request now renders a visible Open simulator link on desktop and phone widths. It carries the active connection into the official simulator, and the page polls for the result. No proof or login result is faked by this UI. Production keeps the standard connection widget. While the server confirms a proof, cancellation and new attempts are blocked; callbacks from an older request cannot change a newer attempt. Failed backend logins reject the verification callback rather than reporting a successful sign-in.
+Sign-in and checkout request Proof of Human with a server-issued login challenge so the staging simulator Human card works. The backend still requires World ID 4.0 and rejects Device-only proofs. The booth cut does not expose a credential method picker.
 
 The earlier missing-key startup error was fixed only in the clone's ignored local environment. A separate random door issuer key was created locally; World registration settings were copied from the existing shared checkout without printing values.
 
@@ -27,12 +25,8 @@ Screenshots from the run are saved locally as `/tmp/houseful-sign-in-success.png
 
 ## Regression checks and limits
 
-Unit checks cover selected preset and challenge binding, version-specific errors, failed backend login rejection, explicit success confirmation and simulator link encoding. Browser specs cover each method, mobile simulator access, cancellation, rejected verification and a delayed server confirmation. The new browser specs have not been run against the disposable harness during this live testing session; the app and persistent local chain were kept available for the user.
+Real World accounts remain separate from this staging flow. Hosted/public-RPC purchases, returned seated checkout and door admission after revocation still need their own checks. A successful local purchase does not resolve the reported port 3000 ownership/binding failure.
 
-Real World accounts remain separate from this staging flow. Repeat sign-in against the real service, account continuity across credential families, hosted/public-RPC purchases, returned seated checkout and door admission after revocation still need their own checks. A successful local purchase does not resolve the reported port 3000 ownership/binding failure.
+## Booth checkout decisions (current main)
 
-## Parallel checkout work
-
-At inspection, the shared checkout contained uncommitted payment-sheet, wallet-selection, settlement text, minting and sign-in changes. Those files were read without editing the shared checkout. Its sign-in preset change to Human is consistent with this fix; the clone also adds method selection, explicit simulator access and backend-error handling.
-
-The uncommitted checkout rewrite calls purchase functions with `"usdt"` and removes the ETH selection. An environment toggle alone would not restore that UI path. Preserve an explicit, tested ETH checkout or another clearly demonstrated Uniswap action for the sponsor demo. These uncommitted changes have not been presented as integrated or verified in the clone.
+The shared booth cut uses: Proof of Human only (no method picker), wallet picker then ETH under the hood without fan-facing Uniswap/ETH→USDT copy, no key export/import, four demo cities, Devcon Mumbai poster, and waitlist hardening. Those decisions supersede the clone notes above about method selection and dual payment chips.
