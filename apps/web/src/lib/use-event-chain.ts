@@ -21,17 +21,31 @@ export type EventChainState = {
   wallet: `0x${string}`;
 };
 
-export function useEventChain(chainEventId: number | null, pollMs = 4000) {
+export function useEventChain(
+  chainEventId: number | null,
+  pollMs = 4000,
+  walletOverride: `0x${string}` | null = null,
+) {
   const [state, setState] = useState<EventChainState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (chainEventId == null || !contractAddress) return;
-    const active = await activePayAddress();
-    const address = active ?? deviceWallet().address;
-    const id = BigInt(chainEventId);
+    if (chainEventId == null) {
+      setError("This show is not listed on-chain yet.");
+      return;
+    }
+    if (!contractAddress) {
+      setError("Houseful contract address is missing in this build.");
+      return;
+    }
     try {
-      const [info, held, waiting] = await Promise.all([
+      const active = walletOverride ?? (await Promise.race([
+        activePayAddress(),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+      ]));
+      const address = active ?? deviceWallet().address;
+      const id = BigInt(chainEventId);
+      const reads = Promise.all([
         publicClient.readContract({ address: contractAddress, abi: housefulAbi, functionName: "getEventInfo", args: [id] }),
         publicClient.readContract({ address: contractAddress, abi: housefulAbi, functionName: "ticketOf", args: [id, address] }),
         publicClient.readContract({
@@ -40,6 +54,12 @@ export function useEventChain(chainEventId: number | null, pollMs = 4000) {
           functionName: "waitlistPositionOf",
           args: [id, address],
         }),
+      ]);
+      const [info, held, waiting] = await Promise.race([
+        reads,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Timed out reading seats from the contract.")), 12_000),
+        ),
       ]);
       setState({
         capacity: Number(info.capacity),
@@ -61,9 +81,9 @@ export function useEventChain(chainEventId: number | null, pollMs = 4000) {
       });
       setError(null);
     } catch (err) {
-      setError((err as Error).message.split("\n")[0]);
+      setError((err as Error).message.split("\n")[0] || "Could not read the contract.");
     }
-  }, [chainEventId]);
+  }, [chainEventId, walletOverride]);
 
   useEffect(() => {
     const first = setTimeout(refresh, 0);

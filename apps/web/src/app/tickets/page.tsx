@@ -4,8 +4,7 @@ import { RiseText } from "@/components/motion/reveal";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { TicketWallet, type WalletEvent } from "@/components/ticket-wallet";
-import { WalletBackup } from "@/components/wallet-backup";
-import { requireFan } from "@/server/auth/session";
+import { getSession } from "@/server/auth/session";
 import { cities, cityEventsForWallet } from "@/server/queries";
 
 export const metadata: Metadata = { title: "Your tickets" };
@@ -15,7 +14,10 @@ export default function TicketsPage() {
 }
 
 async function PageContent() {
-  await requireFan("/tickets");
+  // Tickets are on the paying wallet address. Allow the booth path without a fan cookie so
+  // "Open your ticket" works right after a device-wallet buy.
+  const session = await getSession();
+  const signedIn = session?.account.kind === "fan";
   const allCities = await cities();
   const events = (await Promise.all(allCities.map(city => cityEventsForWallet(city.slug)))).flat();
   const onChain: WalletEvent[] = events
@@ -39,14 +41,11 @@ async function PageContent() {
           <RiseText text="Your tickets" />
         </h1>
         <p className="mt-4 max-w-[52ch] text-ink-soft">
-          Show the live code at the door. It changes every 20 seconds. Once a scanner has synced, older codes stop
-          working there. A screenshot can still work for one or two rotations on a scanner that has not seen it yet.
+          Read from the wallet that paid on {signedIn ? "this account" : "this phone"}. Show the live code at the door.
+          It changes every 20 seconds. Once a scanner has synced, older codes stop working there.
         </p>
         <div className="mt-12">
           <TicketWallet events={onChain} />
-        </div>
-        <div className="mt-16 max-w-[52ch]">
-          <WalletBackup />
         </div>
       </main>
       <SiteFooter />

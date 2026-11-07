@@ -61,7 +61,9 @@ async function main() {
     args: [eventId],
   });
   const price = view.faceValue;
-  console.log(`event #${eventId} faceValue=${price} seated=${view.seated} sold=${view.sold}/${view.capacity}`);
+  // Seated shows reject seat 0; general admission uses 0.
+  const seat = view.seated ? 1 : 0;
+  console.log(`event #${eventId} faceValue=${price} seated=${view.seated} seat=${seat} sold=${view.sold}/${view.capacity}`);
 
   const account = privateKeyToAccount(generatePrivateKey());
   const client = createWalletClient({ account, chain: unichainSepolia, transport: http(rpc) });
@@ -122,7 +124,7 @@ async function main() {
     address: houseful,
     abi: housefulAbi,
     functionName: "buy",
-    args: [eventId, 0, nullifier, deadline, signature],
+    args: [eventId, seat, nullifier, deadline, signature],
   });
   const hash = await client.writeContract(buyReq);
   const receipt = await wait(hash);

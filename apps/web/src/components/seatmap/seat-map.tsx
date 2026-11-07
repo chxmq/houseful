@@ -51,8 +51,9 @@ export function SeatMap({ chainEventId, capacity, seated, value, onChange, disab
   if (!seated) {
     return (
       <div className="rounded-[2px] border border-ink/15 p-4">
-        <p className="text-sm font-semibold">General admission</p>
-        <p className="mt-1 text-sm text-ink-soft">No assigned seat. Show up and find a spot.</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted">Standing room</p>
+        <p className="mt-2 text-sm font-semibold">General admission</p>
+        <p className="mt-1 text-sm text-ink-soft">This night has no assigned seats. Confirm to buy standing entry.</p>
         <button
           type="button"
           disabled={disabled}
@@ -61,7 +62,7 @@ export function SeatMap({ chainEventId, capacity, seated, value, onChange, disab
             value === 0 ? "bg-ink text-paper" : "border border-ink/20"
           }`}
         >
-          Continue without a seat
+          Continue · standing
         </button>
       </div>
     );
@@ -81,8 +82,8 @@ export function SeatMap({ chainEventId, capacity, seated, value, onChange, disab
 
   return (
     <div>
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted">Pick a seat</p>
-      <p className="mt-1 text-sm text-ink-soft">Grey seats are taken. Your pick stays until you pay.</p>
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted">Seat map</p>
+      <p className="mt-1 text-sm text-ink-soft">Tap a free seat. Grey is taken.</p>
       <div className="mt-4 space-y-2 overflow-x-auto">
         {layout.rows.map((row) => (
           <div key={row.label} className="flex items-center gap-2">

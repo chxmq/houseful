@@ -2,29 +2,29 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Assurance } from "@/lib/assurance";
 import { assuranceCopy } from "@/lib/assurance";
 import { explorerTx } from "@/lib/chain";
 import { formatUsdt, formatLongDate } from "@/lib/format";
 import { seatCaption, type SeatId } from "@/lib/seat-layout";
-import { paySigner } from "@/lib/pay-signer";
+import { paySigner, preferPayWallet } from "@/lib/pay-signer";
 import {
+  assertFundsForTicket,
   buyTicket,
   canRetryWithSameAttestation,
   claimReturnedSeat,
-  ethPaymentsEnabled,
   explainError,
   joinWaitlist,
   returnedSeat,
-  type PayMethod,
 } from "@/lib/ticket-actions";
 import { playCue } from "@/lib/sounds";
 import { useEventChain } from "@/lib/use-event-chain";
 import { ArrowRight, QueueIcon } from "./icons";
 import { SplitFlap } from "./motion/split-flap";
-import { TicketMinting } from "./motion/ticket-minting";
+import { TicketMinting, type MintStep } from "./motion/ticket-minting";
 import { TicketPrint } from "./motion/ticket-print";
+import { PayWalletSheet, type PayWalletOption } from "./pay-wallet-sheet";
 import { SeatMap } from "./seatmap/seat-map";
 import { TicketStub } from "./ticket-stub";
 import { VerifyHuman, type Attestation, type VerifyFailure } from "./verify-human";
@@ -45,25 +45,50 @@ export type TicketPanelEvent = {
   assurance: Assurance;
 };
 
-type Step = "verify" | "pay" | "bind";
 type Phase =
   | { name: "idle" }
-  | { name: "working"; done: Step[]; current: Step }
+  | { name: "booking"; step: MintStep; done: MintStep[] }
   | { name: "bought"; ticketId: number; seat: number; hash: string }
   | { name: "joined"; position: number; hash: string }
   | {
       name: "failed";
       failure: VerifyFailure | { kind: "chain"; message: string };
-      /** Unused attestation kept so Try again can retry payment without World again. */
       attestation?: Attestation;
     };
 
 export function TicketPanel({ event }: { event: TicketPanelEvent }) {
-  const { state, error, refresh } = useEventChain(event.chainEventId);
+  const [payWallet, setPayWallet] = useState<`0x${string}` | null>(null);
+  const [pickWallet, setPickWallet] = useState(false);
+  const [runVerify, setRunVerify] = useState(false);
+  const { state, error, refresh } = useEventChain(event.chainEventId, 4000, payWallet);
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
-  const [seat, setSeat] = useState<SeatId | null>(event.seated ? null : 0);
-  const [pay, setPay] = useState<PayMethod>("usdt");
-  const ethOk = ethPaymentsEnabled();
+  const [seat, setSeat] = useState<SeatId | null>(event.seated ? null : null);
+  const [qty] = useState(1); // one World ID → one ticket; host capacity is the inventory limit
+  const [fundError, setFundError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+
+  const locked = phase.name === "booking" || pickWallet || runVerify;
+
+  useEffect(() => {
+    if (!locked) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [locked]);
+
+  const bookingStep = phase.name === "booking" ? phase.step : null;
+  useEffect(() => {
+    if (!bookingStep) return;
+    playCue(bookingStep === "verify" ? "verify" : "step");
+  }, [bookingStep]);
+
+  const seated = state?.seated ?? event.seated;
+  useEffect(() => {
+    // Seated shows must not keep a GA seat 0 from a stale render.
+    if (seated && seat === 0) setSeat(null);
+  }, [seated, seat]);
 
   if (event.chainEventId == null) {
     return (
@@ -86,31 +111,67 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   }
 
   const faceValue = BigInt(event.faceValueUnits);
-  const seated = state?.seated ?? event.seated;
   const mode = !state ? null : state.available > 0 ? (state.returned > 0 && state.available === state.returned ? "claim" : "buy") : "join";
-  const credential = assuranceCopy[event.assurance];
   const seatReady = mode === "join" || seat !== null;
-  // Waitlist promotion: show the ticket panel instead of a stale "joined" state.
   const view: Phase = phase.name === "joined" && state?.mine.ticketId != null ? { name: "idle" } : phase;
 
-  async function onVerified(att: Attestation) {
-    const chainId = event.chainEventId!;
-    setPhase({ name: "working", done: ["verify"], current: "pay" });
+  function startBooking() {
+    if (locked || inFlight.current) return;
+    if (mode !== "join" && seated && (seat == null || seat <= 0)) {
+      playCue("reject");
+      setFundError("Pick a seat first.");
+      return;
+    }
+    playCue("tap");
+    setFundError(null);
+    setPickWallet(true);
+  }
+
+  async function onWalletChosen(wallet: PayWalletOption) {
+    if (inFlight.current) return;
+    playCue("tap");
+    setFundError(null);
+    setPickWallet(false);
+    setPhase({ name: "booking", step: "pay", done: [] });
     try {
-      const signer = await paySigner();
-      playCue("verify");
+      await preferPayWallet(wallet.address, wallet.kind);
+      setPayWallet(wallet.address);
+      const signer = await paySigner(wallet.address);
+      await assertFundsForTicket(signer, faceValue);
+      setPhase({ name: "booking", step: "verify", done: [] });
+      setRunVerify(true);
+      void refresh();
+    } catch (err) {
+      playCue("reject");
+      setRunVerify(false);
+      setPhase({
+        name: "failed",
+        failure: { kind: "chain", message: explainError(err) },
+      });
+    }
+  }
+
+  async function onVerified(att: Attestation) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const chainId = event.chainEventId!;
+    setRunVerify(false);
+    setPhase({ name: "booking", step: "pay", done: ["verify"] });
+    try {
+      const signer = await paySigner(payWallet ?? state?.wallet);
       if (mode === "join") {
-        const res = await joinWaitlist(signer, chainId, faceValue, att, pay);
+        // Demo path: always ETH → USDT via Uniswap so the receipt shows a real swap on-chain.
+        const res = await joinWaitlist(signer, chainId, faceValue, att, "eth");
         playCue("joined");
         setPhase({ name: "joined", position: res.position, hash: res.hash });
       } else {
         const chosen = seat ?? 0;
         const returned = mode === "claim" ? await returnedSeat(chainId) : null;
-        const progress = () => setPhase({ name: "working", done: ["verify", "pay"], current: "bind" });
+        setPhase({ name: "booking", step: "bind", done: ["verify", "pay"] });
         const res =
           returned != null
-            ? await claimReturnedSeat(signer, chainId, returned, faceValue, att, pay).finally(progress)
-            : await buyTicket(signer, chainId, chosen, faceValue, att, pay).finally(progress);
+            ? await claimReturnedSeat(signer, chainId, returned, faceValue, att, "eth")
+            : await buyTicket(signer, chainId, chosen, faceValue, att, "eth");
         playCue("bought");
         setPhase({
           name: "bought",
@@ -121,6 +182,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
       }
       refresh();
     } catch (err) {
+      playCue("reject");
       const message = explainError(err);
       if (/Seat .+ was just taken/i.test(message)) setSeat(null);
       setPhase({
@@ -128,224 +190,313 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
         failure: { kind: "chain", message },
         attestation: canRetryWithSameAttestation(err) ? att : undefined,
       });
+    } finally {
+      inFlight.current = false;
     }
+  }
+
+  function onVerifyFailed(failure: VerifyFailure) {
+    playCue("reject");
+    setRunVerify(false);
+    setPickWallet(false);
+    setPhase({ name: "failed", failure });
+    inFlight.current = false;
   }
 
   function tryAgain() {
-    if (phase.name === "failed") {
-      if (/Seat .+ was just taken/i.test(phase.failure.message)) setSeat(null);
-      if (phase.attestation) {
-        void onVerified(phase.attestation);
-        return;
-      }
+    if (phase.name !== "failed") return;
+    if (/Seat .+ was just taken/i.test(phase.failure.message)) setSeat(null);
+    if (phase.attestation) {
+      setPhase({ name: "booking", step: "pay", done: ["verify"] });
+      void onVerified(phase.attestation);
+      return;
     }
+    setRunVerify(false);
+    setPickWallet(false);
     setPhase({ name: "idle" });
   }
 
+  function cancelWalletPick() {
+    if (phase.name === "booking") return;
+    playCue("tap");
+    setPickWallet(false);
+  }
+
   return (
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">From</p>
-          <p className="mt-1 font-display text-[clamp(2.75rem,8vw,4.25rem)] font-black leading-[0.9] tracking-tight">
-            {formatUsdt(event.priceUsd)}
-          </p>
-        </div>
-        {state && !state.cancelled ? (
-          state.available > 0 ? (
-            <div className="text-right">
-              <SplitFlap value={String(state.available).padStart(3, "0")} className="text-3xl" />
-              <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">left</p>
-            </div>
-          ) : (
-            <div className="text-right">
-              <SplitFlap value={String(state.waitlistActive).padStart(3, "0")} className="text-3xl" />
-              <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-stamp">in line</p>
-            </div>
-          )
-        ) : state?.cancelled ? (
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-stamp">Cancelled</p>
-        ) : (
-          <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
-            {error ? "Offline" : "Checking seats"}
-          </p>
-        )}
-      </div>
+    <div className="relative" aria-busy={locked}>
+      {locked ? (
+        <div
+          className="fixed inset-0 z-40 bg-ink/55 backdrop-blur-[1px]"
+          aria-hidden
+        />
+      ) : null}
 
-      <p className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-soft">
-        <span>Fixed price</span>
-        <span className="text-ink/25" aria-hidden>
-          ·
-        </span>
-        <span>One per person</span>
-        <span className="text-ink/25" aria-hidden>
-          ·
-        </span>
-        <span>Full refund if cancelled</span>
-      </p>
-
-      <div className="mt-6">
-        <AnimatePresence mode="wait" initial={false}>
-          {view.name === "idle" && state ? (
-            <motion.div key="idle" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
-              {state.cancelled ? (
-                state.mine.ticketId != null ? (
-                  <p className="rounded-[4px] bg-paper-deep p-5 text-sm">
-                    This show was cancelled.{" "}
-                    <Link href="/tickets" className="font-semibold underline underline-offset-4">
-                      Claim your refund
-                    </Link>{" "}
-                    from your tickets.
-                  </p>
-                ) : (
-                  <p className="rounded-[4px] bg-paper-deep p-5 text-sm">This show was cancelled. Sales are closed.</p>
-                )
-              ) : state.mine.ticketId != null ? (
-                <Link
-                  href="/tickets"
-                  className="flex items-center justify-between rounded-full bg-admit px-6 py-4 font-semibold text-paper"
-                >
-                  You have a ticket for this show <ArrowRight />
-                </Link>
-              ) : state.mine.waitlistPosition != null ? (
-                <WaitlistSpot position={state.mine.waitlistPosition} slug={event.id} />
+      <div className={`relative ${locked ? "z-50" : ""}`}>
+        <div className={locked && view.name === "idle" ? "pointer-events-none select-none opacity-40" : undefined}>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">From</p>
+              <p className="mt-1 font-display text-[clamp(2.75rem,8vw,4.25rem)] font-black leading-[0.9] tracking-tight">
+                {formatUsdt(event.priceUsd)}
+              </p>
+            </div>
+            {state && !state.cancelled ? (
+              state.available > 0 ? (
+                <div className="text-right">
+                  <SplitFlap value={String(state.available).padStart(3, "0")} className="text-3xl" />
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-muted">left</p>
+                </div>
               ) : (
-                <>
-                  {mode !== "join" ? (
-                    <div className="mb-5">
-                      <SeatMap
-                        chainEventId={event.chainEventId!}
-                        capacity={state.capacity}
-                        seated={seated}
-                        value={seat}
-                        onChange={setSeat}
-                      />
-                    </div>
-                  ) : null}
+                <div className="text-right">
+                  <SplitFlap value={String(state.waitlistActive).padStart(3, "0")} className="text-3xl" />
+                  <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.14em] text-stamp">in line</p>
+                </div>
+              )
+            ) : state?.cancelled ? (
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-stamp">Cancelled</p>
+            ) : (
+              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted">
+                {error ? "Offline" : "Checking seats"}
+              </p>
+            )}
+          </div>
 
-                  {ethOk ? (
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      <PayChoice selected={pay === "usdt"} onClick={() => setPay("usdt")} label="Pay now" />
-                      <PayChoice selected={pay === "eth"} onClick={() => setPay("eth")} label="Pay with Ethereum" />
-                    </div>
-                  ) : null}
+        </div>
 
-                  {seatReady ? (
-                    <>
-                      <VerifyHuman
-                        eventId={event.id}
-                        wallet={state.wallet}
-                        purpose={mode === "join" ? "join" : mode === "claim" ? "claim" : "buy"}
-                        assurance={event.assurance}
-                        label={
-                          mode === "join"
-                            ? "Join the waitlist"
-                            : mode === "claim"
-                              ? "Take a returned seat"
-                              : seated && seat
-                                ? `Get ${seatCaption(seat)}`
-                                : "Get tickets"
-                        }
-                        onVerified={onVerified}
-                        onFailed={(failure) => setPhase({ name: "failed", failure })}
-                      />
-                      <p className="mt-3 text-sm text-muted">
-                        {mode === "join"
-                          ? `Locks ${formatUsdt(event.priceUsd)}. Leave any time for a full refund.`
-                          : `Checked with ${credential.label}. No World App? Use the simulator in the next step.`}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="rounded-[4px] bg-paper-deep/80 px-4 py-3 text-sm text-ink-soft">
-                      Pick a seat to continue.
-                    </p>
-                  )}
-                </>
-              )}
-            </motion.div>
-          ) : null}
-
-          {view.name === "working" ? (
-            <motion.div key="working" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              <TicketMinting
-                done={view.done}
-                current={view.current}
-                title={event.title}
-                priceLabel={formatUsdt(event.priceUsd)}
-                seatLabel={seat != null ? seatCaption(seat) : undefined}
-              />
-            </motion.div>
-          ) : null}
-
-          {view.name === "bought" ? (
-            <motion.div key="bought" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <TicketPrint>
-                <TicketStub
-                  eyebrow={`Admit one · ${formatLongDate(event.startsAt, event.timezone)}`}
+        <div className="mt-6">
+          <AnimatePresence mode="wait" initial={false}>
+            {view.name === "booking" ? (
+              <motion.div
+                key="booking"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="rounded-[6px] bg-paper p-1 shadow-[0_28px_60px_-32px_rgba(20,16,12,0.65)]"
+              >
+                <TicketMinting
+                  done={view.done}
+                  current={view.step}
                   title={event.title}
-                  lines={[
-                    { label: "Venue", value: event.venue },
-                    { label: "Paid", value: formatUsdt(event.priceUsd) },
-                    { label: "Seat", value: seatCaption(view.seat) },
-                    { label: "Ticket", value: `No. ${String(view.ticketId + 1).padStart(4, "0")}` },
-                  ]}
-                  serial={`HSF-${event.chainEventId}-${view.ticketId}`}
-                  stub={<span className="font-display text-4xl font-black uppercase leading-none text-stamp">In</span>}
+                  priceLabel={formatUsdt(event.priceUsd)}
+                  seatLabel={mode === "join" ? "Waitlist" : seat != null ? seatCaption(seat) : undefined}
+                  kind={mode === "join" ? "join" : "buy"}
                 />
-              </TicketPrint>
-              <div className="mt-2 flex flex-wrap items-center gap-4">
-                <Link href="/tickets" className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 font-semibold text-paper">
-                  Open your ticket <ArrowRight size={18} />
-                </Link>
-                <TxLink hash={view.hash} />
-              </div>
-            </motion.div>
-          ) : null}
+                {runVerify ? (
+                  <VerifyHuman
+                    key={`verify-${payWallet ?? state?.wallet}`}
+                    eventId={event.id}
+                    wallet={(payWallet ?? state!.wallet) as `0x${string}`}
+                    purpose={mode === "join" ? "join" : mode === "claim" ? "claim" : "buy"}
+                    assurance={event.assurance}
+                    label="Confirm"
+                    hideButton
+                    autoStart
+                    onVerified={onVerified}
+                    onFailed={onVerifyFailed}
+                  />
+                ) : null}
+                <p className="px-4 pb-4 text-center text-sm text-ink-soft">Stay on this screen. Booking is locked until this finishes.</p>
+              </motion.div>
+            ) : null}
 
-          {view.name === "joined" ? (
-            <motion.div key="joined" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-              <WaitlistSpot position={view.position} slug={event.id} fresh />
-              <div className="mt-3">
-                <TxLink hash={view.hash} />
-              </div>
-            </motion.div>
-          ) : null}
+            {view.name === "idle" && !state ? (
+              <motion.div key="loading" className="rounded-[4px] bg-paper-deep/80 px-4 py-4 text-sm text-ink-soft" role="status">
+                {error
+                  ? "Could not reach the contract. Check your network, then refresh."
+                  : event.status === "sold_out"
+                    ? "Checking the waitlist on-chain…"
+                    : "Checking seats on-chain…"}
+              </motion.div>
+            ) : null}
 
-          {view.name === "failed" ? (
-            <motion.div
-              key="failed"
-              initial={{ opacity: 0, x: -6 }}
-              animate={{ opacity: 1, x: [0, -6, 5, -3, 0] }}
-              transition={{ duration: 0.45 }}
-              className="rounded-[4px] border-l-[3px] border-stamp bg-paper-deep p-5"
-            >
-              <p className="font-semibold">{view.failure.message}</p>
-              <FailureNext kind={view.failure.kind} assurance={event.assurance} />
-              {view.attestation ? (
-                <p className="mt-2 text-sm text-ink-soft">Your verification is still good. Try again continues the payment.</p>
-              ) : null}
-              <button type="button" onClick={tryAgain} className="mt-4 text-sm font-medium underline underline-offset-4">
-                Try again
-              </button>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+            {view.name === "idle" && state ? (
+              <motion.div key="idle" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
+                {state.cancelled ? (
+                  state.mine.ticketId != null ? (
+                    <p className="rounded-[4px] bg-paper-deep p-5 text-sm">
+                      This show was cancelled.{" "}
+                      <Link href="/tickets" className="font-semibold underline underline-offset-4">
+                        Claim your refund
+                      </Link>{" "}
+                      from your tickets.
+                    </p>
+                  ) : (
+                    <p className="rounded-[4px] bg-paper-deep p-5 text-sm">This show was cancelled. Sales are closed.</p>
+                  )
+                ) : state.mine.ticketId != null ? (
+                  <Link
+                    href="/tickets"
+                    className="flex items-center justify-between rounded-full bg-admit px-6 py-4 font-semibold text-paper"
+                  >
+                    You have a ticket for this show <ArrowRight />
+                  </Link>
+                ) : state.mine.waitlistPosition != null ? (
+                  <WaitlistSpot position={state.mine.waitlistPosition} slug={event.id} />
+                ) : (
+                  <div className={locked ? "pointer-events-none select-none opacity-40" : undefined}>
+                    {mode === "join" ? (
+                      <p className="mb-5 rounded-[4px] border border-stamp/30 bg-stamp/5 px-4 py-3 text-sm text-ink-soft">
+                        Sold out. Join the public waitlist at face value. When someone hands a seat back, the first
+                        person still waiting gets it in the same transaction.{" "}
+                        <Link href={`/e/${event.id}/waitlist`} className="font-medium text-stamp underline underline-offset-4">
+                          See the line
+                        </Link>
+                      </p>
+                    ) : (
+                      <div className="mb-6">
+                        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">1 · Choose seat</p>
+                        <SeatMap
+                          chainEventId={event.chainEventId!}
+                          capacity={state.capacity}
+                          seated={seated}
+                          value={seat}
+                          onChange={(next) => {
+                            setFundError(null);
+                            setSeat(next);
+                          }}
+                          disabled={locked}
+                        />
+                      </div>
+                    )}
+
+                    {seatReady ? (
+                      <>
+                        <div className="mb-5 rounded-[4px] border border-ink/15 p-4">
+                          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+                            {mode === "join" ? "1 · Waitlist order" : "2 · Your order"}
+                          </p>
+                          <dl className="mt-3 space-y-2 text-sm">
+                            <div className="flex justify-between gap-4">
+                              <dt className="text-ink-soft">{mode === "join" ? "Place" : "Tickets"}</dt>
+                              <dd className="font-semibold">
+                                {qty} <span className="font-normal text-muted">(max 1 per person)</span>
+                              </dd>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <dt className="text-ink-soft">{mode === "join" ? "People in line" : "Host capacity"}</dt>
+                              <dd className="font-semibold">
+                                {mode === "join"
+                                  ? `${state.waitlistActive} waiting`
+                                  : `${state.available} left of ${state.capacity}`}
+                              </dd>
+                            </div>
+                            {mode !== "join" ? (
+                              <div className="flex justify-between gap-4">
+                                <dt className="text-ink-soft">Seat</dt>
+                                <dd className="font-semibold">{seat != null ? seatCaption(seat) : "—"}</dd>
+                              </div>
+                            ) : null}
+                            <div className="flex justify-between gap-4">
+                              <dt className="text-ink-soft">Face price held</dt>
+                              <dd className="font-semibold">{formatUsdt(event.priceUsd)}</dd>
+                            </div>
+                            <div className="flex justify-between gap-4">
+                              <dt className="text-ink-soft">You pay</dt>
+                              <dd className="font-semibold">{formatUsdt(event.priceUsd)}</dd>
+                            </div>
+                          </dl>
+                        </div>
+
+                        <p className="mb-3 font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+                          {mode === "join" ? "2 · Pay & join" : "3 · Pay"}
+                        </p>
+                        <VerifyHuman
+                          eventId={event.id}
+                          wallet={(payWallet ?? state.wallet) as `0x${string}`}
+                          purpose={mode === "join" ? "join" : mode === "claim" ? "claim" : "buy"}
+                          assurance={event.assurance}
+                          label={
+                            mode === "join"
+                              ? `Join waitlist · ${formatUsdt(event.priceUsd)}`
+                              : mode === "claim"
+                                ? `Take returned seat · ${formatUsdt(event.priceUsd)}`
+                                : `Buy ${qty} · ${formatUsdt(event.priceUsd)}`
+                          }
+                          onRequestStart={startBooking}
+                          onVerified={onVerified}
+                          onFailed={onVerifyFailed}
+                        />
+                        {fundError ? <p className="mt-3 text-sm font-medium text-reject">{fundError}</p> : null}
+                        <p className="mt-3 text-sm text-muted">
+                          {mode === "join"
+                            ? "Face value is held until you get a seat or leave for a full refund."
+                            : "Confirm with World ID, then pay from the wallet you pick."}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="rounded-[4px] bg-paper-deep/80 px-4 py-3 text-sm text-ink-soft">
+                        {seated ? "Pick a seat above, then you can buy." : "Confirm standing entry above, then you can buy."}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            ) : null}
+
+            {view.name === "bought" ? (
+              <motion.div key="bought" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                <TicketPrint>
+                  <TicketStub
+                    eyebrow={`Admit one · ${formatLongDate(event.startsAt, event.timezone)}`}
+                    title={event.title}
+                    lines={[
+                      { label: "Venue", value: event.venue },
+                      { label: "Paid", value: formatUsdt(event.priceUsd) },
+                      { label: "Seat", value: seatCaption(view.seat) },
+                      { label: "Ticket", value: `No. ${String(view.ticketId + 1).padStart(4, "0")}` },
+                    ]}
+                    serial={`HSF-${event.chainEventId}-${view.ticketId}`}
+                    stub={<span className="font-display text-4xl font-black uppercase leading-none text-stamp">In</span>}
+                  />
+                </TicketPrint>
+                <div className="mt-2 flex flex-wrap items-center gap-4">
+                  <Link href="/tickets" className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 font-semibold text-paper">
+                    Open your ticket <ArrowRight size={18} />
+                  </Link>
+                  <TxLink hash={view.hash} />
+                </div>
+              </motion.div>
+            ) : null}
+
+            {view.name === "joined" ? (
+              <motion.div key="joined" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+                <WaitlistSpot position={view.position} slug={event.id} fresh />
+                <div className="mt-3">
+                  <TxLink hash={view.hash} />
+                </div>
+              </motion.div>
+            ) : null}
+
+            {view.name === "failed" ? (
+              <motion.div
+                key="failed"
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: [0, -6, 5, -3, 0] }}
+                transition={{ duration: 0.45 }}
+                className="rounded-[4px] border-l-[3px] border-stamp bg-paper-deep p-5"
+              >
+                <p className="font-semibold">{view.failure.message}</p>
+                <FailureNext kind={view.failure.kind} assurance={event.assurance} />
+                {view.attestation ? (
+                  <p className="mt-2 text-sm text-ink-soft">Your verification is still good. Try again continues the payment.</p>
+                ) : null}
+                <button type="button" onClick={tryAgain} className="mt-4 text-sm font-medium underline underline-offset-4">
+                  Try again
+                </button>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
       </div>
-    </div>
-  );
-}
 
-function PayChoice({ selected, onClick, label }: { selected: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm font-semibold ${
-        selected ? "bg-ink text-paper" : "border border-ink/20 text-ink"
-      }`}
-    >
-      {label}
-    </button>
+      <PayWalletSheet
+        open={pickWallet}
+        onClose={cancelWalletPick}
+        onChoose={(wallet) => {
+          void onWalletChosen(wallet);
+        }}
+      />
+    </div>
   );
 }
 
@@ -406,4 +557,3 @@ function TxLink({ hash }: { hash: string }) {
     <span className="font-mono text-xs text-muted">{label}</span>
   );
 }
-

@@ -2,7 +2,7 @@
 
 import {
   IDKitRequestWidget,
-  selfieCheck,
+  proofOfHuman,
   type IDKitErrorCodes,
   type IDKitResult,
   type RpContext,
@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { PersonCheckIcon } from "@/components/icons";
 import { safeNextPath } from "@/lib/safe-next";
+import { playCue } from "@/lib/sounds";
 
 type WorldRequest = {
   appId: `app_${string}`;
@@ -32,7 +33,7 @@ function messageFor(code: IDKitErrorCodes): string {
       return "Sign-in was cancelled.";
     case "credential_unavailable":
     case "world_id_4_not_available":
-      return "Your World ID does not have a Selfie Check yet.";
+      return "World could not issue a Proof of Human for this request. In the simulator keep World ID 4.0 and Human selected.";
     case "timeout":
     case "connection_failed":
       return "World App did not respond in time.";
@@ -75,6 +76,7 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
   const destination = safeNextPath(next, "/account");
 
   async function start() {
+    playCue("tap");
     setBusy(true);
     setError(null);
     try {
@@ -85,10 +87,12 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not start World ID.");
+      playCue("step");
       setRequest(data);
       settled.current = false;
       setOpen(true);
     } catch (err) {
+      playCue("reject");
       setError(plainServerError((err as Error).message));
     } finally {
       setBusy(false);
@@ -104,16 +108,20 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
     });
     const data = await res.json();
     if (!res.ok) {
+      playCue("reject");
       setError(plainServerError(data.error));
       return;
     }
+    playCue("verify");
     setOpen(false);
     router.replace(destination);
     router.refresh();
   }
 
+  // Staging simulator exposes a Human card, not Selfie Check. Proof of Human matches that card
+  // and still satisfies our selfie-or-stronger account bar.
   const signal = request ? `houseful:login:${request.challenge}` : "";
-  const preset = selfieCheck({ signal });
+  const preset = proofOfHuman({ signal });
 
   return (
     <div>
@@ -150,6 +158,7 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
           onSuccess={() => setOpen(false)}
           onError={(code) => {
             settled.current = true;
+            playCue("reject");
             setError(messageFor(code));
           }}
         />

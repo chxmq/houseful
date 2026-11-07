@@ -11,6 +11,7 @@ import type { Attestation } from "@/components/verify-human";
 import { contractAddress, housefulAbi, quoterAddr, usdtAddr, usdtAbi, poolFee } from "./contract";
 import { deviceDoorKey, doorKeyBytes32 } from "./door-key";
 import { deviceWallet, ensureFunded, publicClient } from "./device-wallet";
+import { formatEth } from "./format";
 
 /** Wallet the product stream will swap in; device wallet fills this until then. */
 export type ActionSigner = {
@@ -24,7 +25,8 @@ export function deviceSigner(): ActionSigner {
   return { address: account.address, kind: "device", client };
 }
 
-const payWithEth = process.env.NEXT_PUBLIC_PAY_WITH_ETH !== "false";
+/** Opt-in. Off by default so checkout is one path (face-value USDT). E2E sets this true. */
+const payWithEth = process.env.NEXT_PUBLIC_PAY_WITH_ETH === "true";
 
 const friendly: Record<string, string> = {
   SurrenderOnly: "Houseful tickets cannot be flipped above face value. Resell at face value to the waitlist instead.",
@@ -42,7 +44,7 @@ const friendly: Record<string, string> = {
   WaitlistBacklog: "The waitlist has a backlog of departed slots. Ask someone to clear it, then try again.",
   EventIsCancelled: "This show was cancelled. You can claim a refund.",
   WrongPayment: "The amount sent did not match the face value.",
-  NotTicketOwner: "This ticket is not held by this phone.",
+  NotTicketOwner: "Could not bind the door key yet. If you just paid, open My tickets — the seat is yours.",
   InvalidSchedule: "The dates do not work: the hand-back cutoff must come after sales open and before the show ends.",
   InvalidCapacity: "A show needs at least one seat.",
   NotHost: "Only the wallet that listed this show can do that.",
@@ -240,6 +242,8 @@ const quoterV2Abi = [
   },
 ] as const;
 
+const GAS_HEADROOM = 3_000_000_000_000_000n; // 0.003 ETH for approve-free buyWithEth + bind
+
 /** Quote ETH needed for exact faceValue USDT, then add 2 percent headroom. */
 export async function quoteEthForUsdt(faceValue: bigint): Promise<bigint> {
   const weth = process.env.NEXT_PUBLIC_WETH_ADDRESS as `0x${string}` | undefined;
@@ -271,12 +275,87 @@ export function ethPaymentsEnabled() {
   return payWithEth;
 }
 
+/** ETH required for a demo buyWithEth (swap + gas headroom). */
+export async function ethNeededForTicket(faceValue: bigint): Promise<bigint> {
+  return (await quoteEthForUsdt(faceValue)) + GAS_HEADROOM;
+}
+
+/**
+ * Confirms the wallet can cover the ticket. Tops up test ETH once via the faucet when short.
+ * Throws in plain words if it still cannot pay — never starts World/pay blind.
+ */
+export async function assertFundsForTicket(signer: ActionSigner, faceValue: bigint): Promise<{ need: bigint; have: bigint }> {
+  const need = await ethNeededForTicket(faceValue);
+  let have = await publicClient.getBalance({ address: signer.address });
+  if (have >= need) return { need, have };
+  have = await ensureFunded(signer.address, need);
+  if (have >= need) return { need, have };
+  throw new Error(
+    `Not enough ETH to buy this ticket. Need about ${formatEth(need)}, this wallet has ${formatEth(have)}.`,
+  );
+}
+
+export type PayMethod = "usdt" | "eth" | "auto";
+
+/** USDT if this wallet already holds the face value; otherwise ETH and Uniswap exact-out. */
+export async function resolvePayMethod(signer: ActionSigner, faceValue: bigint): Promise<"usdt" | "eth"> {
+  const token = requireUsdt();
+  const balance = await publicClient.readContract({
+    address: token,
+    abi: usdtAbi,
+    functionName: "balanceOf",
+    args: [signer.address],
+  });
+  if (balance >= faceValue) return "usdt";
+  return "eth";
+}
+
+async function waitUntilTicketHeld(chainEventId: number, wallet: `0x${string}`, ticketId: number) {
+  const address = requireContract();
+  for (let i = 0; i < 40; i++) {
+    const [held, id] = await publicClient.readContract({
+      address,
+      abi: housefulAbi,
+      functionName: "ticketOf",
+      args: [BigInt(chainEventId), wallet],
+    });
+    if (held && Number(id) === ticketId) return;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+}
+
 export async function bindDoorKey(signer: ActionSigner, chainEventId: number, ticketId: number) {
+  await waitUntilTicketHeld(chainEventId, signer.address, ticketId);
   const key = deviceDoorKey();
   return send(signer, "setDoorKey", [BigInt(chainEventId), BigInt(ticketId), doorKeyBytes32(key)]);
 }
 
-export type PayMethod = "usdt" | "eth";
+/** Bind after purchase. Never throws away a paid ticket if the RPC is slow. */
+async function bindAfterPurchase(signer: ActionSigner, chainEventId: number, ticketId: number) {
+  try {
+    return await bindDoorKey(signer, chainEventId, ticketId);
+  } catch {
+    return { hash: "0x" as Hex, receipt: undefined };
+  }
+}
+
+async function payAndSend(
+  signer: ActionSigner,
+  pay: PayMethod,
+  faceValue: bigint,
+  usdtFn: "buy" | "joinWaitlist" | "claimReturned",
+  ethFn: "buyWithEth" | "joinWaitlistWithEth" | "claimReturnedWithEth",
+  args: readonly unknown[],
+) {
+  const method = pay === "auto" ? await resolvePayMethod(signer, faceValue) : pay;
+  if (method === "eth") {
+    const value = await quoteEthForUsdt(faceValue);
+    return { ...(await send(signer, ethFn, args, value)), method };
+  }
+  await ensureUsdt(signer, faceValue);
+  await approveUsdt(signer, faceValue);
+  return { ...(await send(signer, usdtFn, args)), method };
+}
 
 export async function buyTicket(
   signer: ActionSigner,
@@ -284,22 +363,14 @@ export async function buyTicket(
   seat: number,
   faceValue: bigint,
   att: Attestation,
-  pay: PayMethod = "usdt",
+  pay: PayMethod = "auto",
 ) {
   const args = [BigInt(chainEventId), seat, BigInt(att.nullifier), BigInt(att.deadline), att.signature] as const;
-  let hash: Hex;
-  let receipt;
-  if (pay === "eth") {
-    const value = await quoteEthForUsdt(faceValue);
-    ({ hash, receipt } = await send(signer, "buyWithEth", args, value));
-  } else {
-    await ensureUsdt(signer, faceValue);
-    await approveUsdt(signer, faceValue);
-    ({ hash, receipt } = await send(signer, "buy", args));
-  }
+  const { hash, receipt } = await payAndSend(signer, pay, faceValue, "buy", "buyWithEth", args);
   const [bought] = parseEventLogs({ abi: housefulAbi, logs: receipt.logs, eventName: "TicketBought" });
+  if (!bought) throw new Error("Payment went through but the ticket event was missing. Check the receipt.");
   const ticketId = Number(bought.args.ticketId);
-  const bind = await bindDoorKey(signer, chainEventId, ticketId);
+  const bind = await bindAfterPurchase(signer, chainEventId, ticketId);
   return { hash, ticketId, seat: Number(bought.args.seat), bindHash: bind.hash };
 }
 
@@ -309,7 +380,7 @@ export async function claimReturnedSeat(
   ticketId: number,
   faceValue: bigint,
   att: Attestation,
-  pay: PayMethod = "usdt",
+  pay: PayMethod = "auto",
 ) {
   const args = [
     BigInt(chainEventId),
@@ -318,16 +389,8 @@ export async function claimReturnedSeat(
     BigInt(att.deadline),
     att.signature,
   ] as const;
-  let hash: Hex;
-  if (pay === "eth") {
-    const value = await quoteEthForUsdt(faceValue);
-    ({ hash } = await send(signer, "claimReturnedWithEth", args, value));
-  } else {
-    await ensureUsdt(signer, faceValue);
-    await approveUsdt(signer, faceValue);
-    ({ hash } = await send(signer, "claimReturned", args));
-  }
-  const bind = await bindDoorKey(signer, chainEventId, ticketId);
+  const { hash } = await payAndSend(signer, pay, faceValue, "claimReturned", "claimReturnedWithEth", args);
+  const bind = await bindAfterPurchase(signer, chainEventId, ticketId);
   return { hash, ticketId, bindHash: bind.hash };
 }
 
@@ -336,20 +399,12 @@ export async function joinWaitlist(
   chainEventId: number,
   faceValue: bigint,
   att: Attestation,
-  pay: PayMethod = "usdt",
+  pay: PayMethod = "auto",
 ) {
   const args = [BigInt(chainEventId), BigInt(att.nullifier), BigInt(att.deadline), att.signature] as const;
-  let hash: Hex;
-  let receipt;
-  if (pay === "eth") {
-    const value = await quoteEthForUsdt(faceValue);
-    ({ hash, receipt } = await send(signer, "joinWaitlistWithEth", args, value));
-  } else {
-    await ensureUsdt(signer, faceValue);
-    await approveUsdt(signer, faceValue);
-    ({ hash, receipt } = await send(signer, "joinWaitlist", args));
-  }
+  const { hash, receipt } = await payAndSend(signer, pay, faceValue, "joinWaitlist", "joinWaitlistWithEth", args);
   const [joined] = parseEventLogs({ abi: housefulAbi, logs: receipt.logs, eventName: "WaitlistJoined" });
+  if (!joined) throw new Error("Payment went through but the waitlist event was missing. Check the receipt.");
   return { hash, position: Number(joined.args.position), head: joined.args.head as Hex };
 }
 

@@ -23,10 +23,24 @@ export async function activePayAddress(): Promise<`0x${string}` | null> {
   return null;
 }
 
-export async function paySigner(): Promise<ActionSigner> {
+export async function paySigner(prefer?: `0x${string}` | null): Promise<ActionSigner> {
+  if (prefer) return signerForAddress(prefer.toLowerCase() as `0x${string}`);
   const active = await activePayAddress();
   if (!active) return deviceSigner();
   return signerForAddress(active);
+}
+
+/** Remember this address as the account's active pay wallet when signed in. */
+export async function preferPayWallet(address: `0x${string}`, kind: "device" | "external" = "external") {
+  try {
+    await fetch("/api/account/wallets", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address, kind }),
+    });
+  } catch {
+    // Signed out: local override is enough for this purchase.
+  }
 }
 
 /** Signer for a host session address: injected wallet preferred, device only when it matches. */

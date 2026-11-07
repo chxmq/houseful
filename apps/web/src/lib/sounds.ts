@@ -3,7 +3,7 @@
  * motion, or when HOUSEFUL_MUTE=1 is set on window for demos that need silence.
  */
 
-type Cue = "verify" | "bought" | "joined" | "handback" | "admit" | "reject";
+type Cue = "tap" | "step" | "verify" | "bought" | "joined" | "handback" | "admit" | "reject";
 
 let ctx: AudioContext | null = null;
 
@@ -34,6 +34,13 @@ function tone(c: AudioContext, freq: number, start: number, dur: number, gain = 
 }
 
 const patterns: Record<Cue, (c: AudioContext, t0: number) => void> = {
+  tap: (c, t0) => {
+    tone(c, 660, t0, 0.04, 0.025, "triangle");
+  },
+  step: (c, t0) => {
+    tone(c, 392, t0, 0.05, 0.025);
+    tone(c, 523.25, t0 + 0.05, 0.06, 0.03);
+  },
   verify: (c, t0) => {
     tone(c, 523.25, t0, 0.07, 0.03); // C5
     tone(c, 659.25, t0 + 0.06, 0.09, 0.035); // E5

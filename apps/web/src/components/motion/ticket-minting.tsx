@@ -5,14 +5,19 @@ import type { ReactNode } from "react";
 import { CheckIcon } from "../icons";
 
 export type MintStep = "verify" | "pay" | "bind";
+export type MintKind = "buy" | "join";
 
 const labels: Record<MintStep, string> = {
-  verify: "Checking you are one person",
-  pay: "Taking face value into the contract",
-  bind: "Binding this phone for the door",
+  verify: "Confirming you are one person",
+  pay: "Taking payment",
+  bind: "Locking the ticket to this wallet",
 };
 
-const order: MintStep[] = ["verify", "pay", "bind"];
+const joinLabels: Record<MintStep, string> = {
+  verify: "Confirming you are one person",
+  pay: "Holding your place at face value",
+  bind: "Confirming your place in line",
+};
 
 type TicketMintingProps = {
   done: MintStep[];
@@ -20,20 +25,23 @@ type TicketMintingProps = {
   title: string;
   priceLabel: string;
   seatLabel?: string;
+  kind?: MintKind;
 };
 
 /**
  * Checkout wait state: a ticket feeds from a slot while each step inks in.
  * Reads as a real printer, not a spinner dashboard.
  */
-export function TicketMinting({ done, current, title, priceLabel, seatLabel }: TicketMintingProps) {
+export function TicketMinting({ done, current, title, priceLabel, seatLabel, kind = "buy" }: TicketMintingProps) {
   const reduce = useReducedMotion();
-  const progress = (done.length + (current ? 0.55 : 0)) / order.length;
+  const order: MintStep[] = kind === "join" ? ["verify", "pay"] : ["verify", "pay", "bind"];
+  const stepLabels = kind === "join" ? joinLabels : labels;
+  const progress = (done.filter((s) => order.includes(s)).length + (current && order.includes(current) ? 0.55 : 0)) / order.length;
 
   return (
     <div className="relative" role="status" aria-live="polite" aria-busy="true">
       <p className="sr-only">
-        {labels[current]}. {done.length} of {order.length} steps done.
+        {stepLabels[current]}. {done.filter((s) => order.includes(s)).length} of {order.length} steps done.
       </p>
 
       <div className="relative z-10 mx-auto h-3.5 max-w-[520px] rounded-full bg-ink shadow-[inset_0_-3px_0_rgba(255,255,255,0.08),0_8px_20px_-12px_rgba(20,17,15,0.5)]">
@@ -50,7 +58,9 @@ export function TicketMinting({ done, current, title, priceLabel, seatLabel }: T
           <div className="relative flex overflow-hidden rounded-[14px] bg-paper-deep text-ink shadow-[0_22px_40px_-24px_rgba(20,17,15,0.45)]">
             <div className="min-w-0 flex-1 p-5 sm:p-6">
               <div className="flex items-center justify-between gap-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted">Printing ticket</p>
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
+                  {kind === "join" ? "Joining the line" : "Printing ticket"}
+                </p>
                 <span className="font-mono text-[10px] tabular-nums text-muted">{Math.round(progress * 100)}%</span>
               </div>
 
@@ -67,7 +77,9 @@ export function TicketMinting({ done, current, title, priceLabel, seatLabel }: T
               </motion.div>
 
               <InkLine ready={done.includes("verify") || current === "verify"} delay={0.05} className="mt-5">
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">Admit one</p>
+                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
+                  {kind === "join" ? "One place in line" : "Admit one"}
+                </p>
               </InkLine>
 
               <InkLine ready={done.includes("verify") || current === "verify"} delay={0.12} className="mt-2">
@@ -87,9 +99,15 @@ export function TicketMinting({ done, current, title, priceLabel, seatLabel }: T
                 </InkLine>
               </div>
 
-              <InkLine ready={done.includes("bind") || current === "bind"} delay={0.08} className="mt-5">
-                <p className="font-mono text-[11px] tracking-[0.2em] text-muted">HSF · BINDING DOOR KEY</p>
-              </InkLine>
+              {kind === "buy" ? (
+                <InkLine ready={done.includes("bind") || current === "bind"} delay={0.08} className="mt-5">
+                  <p className="font-mono text-[11px] tracking-[0.2em] text-muted">HSF · BINDING DOOR KEY</p>
+                </InkLine>
+              ) : (
+                <InkLine ready={done.includes("pay") || current === "pay"} delay={0.08} className="mt-5">
+                  <p className="font-mono text-[11px] tracking-[0.2em] text-muted">HSF · HOLDING YOUR PLACE</p>
+                </InkLine>
+              )}
 
               {!reduce ? <PrintHead /> : null}
             </div>
@@ -108,10 +126,12 @@ export function TicketMinting({ done, current, title, priceLabel, seatLabel }: T
                 }
                 transition={{ repeat: Infinity, duration: 1.4, ease: "easeInOut" }}
               >
-                {done.includes("bind") ? (
+                {kind === "buy" && done.includes("bind") ? (
+                  <CheckIcon size={22} />
+                ) : kind === "join" && done.includes("pay") && current !== "pay" ? (
                   <CheckIcon size={22} />
                 ) : (
-                  <span className="font-display text-2xl font-black uppercase text-stamp">In</span>
+                  <span className="font-display text-2xl font-black uppercase text-stamp">{kind === "join" ? "#" : "In"}</span>
                 )}
               </motion.div>
             </div>
@@ -132,7 +152,7 @@ export function TicketMinting({ done, current, title, priceLabel, seatLabel }: T
               >
                 {isDone ? <CheckIcon size={14} /> : isActive ? <PulseDot /> : null}
               </span>
-              <span className={isDone || isActive ? "text-ink" : "text-muted"}>{labels[step]}</span>
+              <span className={isDone || isActive ? "text-ink" : "text-muted"}>{stepLabels[step]}</span>
             </li>
           );
         })}

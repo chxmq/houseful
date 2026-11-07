@@ -20,6 +20,7 @@ import {
 import { DoorCode } from "./door-code";
 import { ArrowRight, ReturnIcon } from "./icons";
 import { SplitFlap } from "./motion/split-flap";
+import { WorkingLock } from "./motion/working-lock";
 import { TicketStub } from "./ticket-stub";
 
 export type WalletEvent = {
@@ -133,7 +134,17 @@ export function TicketWallet({ events }: { events: WalletEvent[] }) {
       </AnimatePresence>
 
       {holdings === null ? (
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Reading your tickets from the contract</p>
+        <div className="max-w-[36ch]" role="status" aria-busy="true">
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Reading the contract</p>
+          <motion.div className="mt-4 h-1 overflow-hidden rounded-full bg-ink/10">
+            <motion.div
+              className="h-full w-1/3 bg-stamp"
+              animate={{ x: ["-10%", "220%"] }}
+              transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
+            />
+          </motion.div>
+          <p className="mt-3 text-sm text-ink-soft">Pulling tickets and waitlist places for this wallet.</p>
+        </div>
       ) : holdings.length === 0 ? (
         <div className="max-w-[46ch]">
           <p className="font-display text-4xl font-black uppercase leading-none">Nothing booked yet</p>
@@ -141,7 +152,7 @@ export function TicketWallet({ events }: { events: WalletEvent[] }) {
             Tickets you buy on this phone live here, with the code you show at the door.
           </p>
           <Link href="/mumbai" className="mt-6 inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 font-semibold text-paper">
-            See what is on in Mumbai <ArrowRight size={18} />
+            Browse Mumbai <ArrowRight size={18} />
           </Link>
         </div>
       ) : (
@@ -191,16 +202,19 @@ function HeldTicket({
 }) {
   const { event, ticketId } = holding;
   const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [torn, setTorn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
 
   async function handBack() {
-    setBusy(true);
+    if (busy) return;
+    playCue("tap");
+    setBusy("Reselling at face value");
     setError(null);
     try {
       const signer = await paySigner();
+      playCue("step");
       const res = await surrenderTicket(signer, event.chainEventId, ticketId);
       playCue("handback");
       setResult(
@@ -209,122 +223,152 @@ function HeldTicket({
           : `Refunded ${formatUsdt(event.priceUsd)}. Your seat went to ${shortHex(res.to)}, next in line, in the same transaction.`,
       );
       setTorn(true);
+      setBusy(null);
     } catch (err) {
+      playCue("reject");
       setError(explainError(err));
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function refund() {
-    setBusy(true);
+    if (busy) return;
+    playCue("tap");
+    setBusy("Claiming refund");
     setError(null);
     try {
       const signer = await paySigner();
+      playCue("step");
       await claimRefund(signer, event.chainEventId);
+      playCue("handback");
       setResult(`${event.title} was cancelled. ${formatUsdt(event.priceUsd)} is back in this phone's wallet.`);
       setTorn(true);
+      setBusy(null);
     } catch (err) {
+      playCue("reject");
       setError(explainError(err));
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function bind() {
-    setBusy(true);
+    if (busy) return;
+    playCue("tap");
+    setBusy("Binding door key");
+    setError(null);
     try {
       const signer = await paySigner();
+      playCue("step");
       await bindDoorKey(signer, event.chainEventId, ticketId);
+      playCue("verify");
+      setBusy(null);
       onChanged("This phone is now the key for your ticket.");
     } catch (err) {
+      playCue("reject");
       setError(explainError(err));
-    } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   return (
-    <li>
-      <TicketStub
-        tone="ink"
-        torn={torn}
-        onTornComplete={() => result && onChanged(result)}
-        eyebrow={`Admit one · ${formatLongDate(event.startsAt, event.timezone)}`}
-        title={event.title}
-        lines={[
-          { label: "Venue", value: event.venue },
-          { label: "Doors", value: formatTime(event.doorsAt, event.timezone) },
-          { label: "Paid", value: formatUsdt(event.priceUsd) },
-          { label: "Seat", value: seatCaption(holding.seat) },
-        ]}
-        serial={`HSF-${event.chainEventId}-${ticketId} · GEN ${holding.generation}`}
-        stub={
-          holding.cancelled ? (
-            <div className="flex max-w-[17ch] flex-col items-center gap-3 text-center">
-              <p className="font-display text-2xl font-extrabold uppercase leading-none text-stamp">Cancelled</p>
-              <button
-                type="button"
-                onClick={refund}
-                disabled={busy || torn}
-                className="rounded-full bg-marigold px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
-              >
-                {busy ? "Refunding" : `Claim ${formatUsdt(event.priceUsd)}`}
-              </button>
-              {error ? <p className="text-xs text-paper/70">{error}</p> : null}
-            </div>
-          ) : holding.door === "here" ? (
-            <DoorCode chainEventId={event.chainEventId} ticketId={ticketId} wallet={wallet} />
-          ) : (
-            <div className="flex max-w-[17ch] flex-col items-center gap-3 text-center">
-              <p className="text-xs text-paper/70">
-                {holding.door === "none"
-                  ? "The door code needs this phone's key on the ticket first."
-                  : "The door key on this ticket belongs to another phone."}
-              </p>
-              <button
-                type="button"
-                onClick={bind}
-                disabled={busy}
-                className="rounded-full bg-marigold px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
-              >
-                {busy ? "Binding" : holding.door === "none" ? "Bind this phone" : "Move it to this phone"}
-              </button>
-            </div>
-          )
-        }
-      />
+    <li className="relative" aria-busy={Boolean(busy)}>
+      {busy ? <WorkingLock label={busy} detail="On-chain · do not leave this page" /> : null}
+      <div className={busy ? "relative z-50 pointer-events-none select-none opacity-50" : undefined}>
+        <TicketStub
+          tone="ink"
+          torn={torn}
+          onTornComplete={() => result && onChanged(result)}
+          eyebrow={`Admit one · ${formatLongDate(event.startsAt, event.timezone)}`}
+          title={event.title}
+          lines={[
+            { label: "Venue", value: event.venue },
+            { label: "Doors", value: formatTime(event.doorsAt, event.timezone) },
+            { label: "Paid", value: formatUsdt(event.priceUsd) },
+            { label: "Seat", value: seatCaption(holding.seat) },
+          ]}
+          serial={`HSF-${event.chainEventId}-${ticketId} · GEN ${holding.generation}`}
+          stub={
+            holding.cancelled ? (
+              <div className="flex max-w-[17ch] flex-col items-center gap-3 text-center">
+                <p className="font-display text-2xl font-extrabold uppercase leading-none text-stamp">Cancelled</p>
+                <button
+                  type="button"
+                  onClick={refund}
+                  disabled={Boolean(busy) || torn}
+                  className="rounded-full bg-marigold px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                >
+                  {busy ? "Refunding" : `Claim ${formatUsdt(event.priceUsd)}`}
+                </button>
+                {error ? <p className="text-xs text-paper/70">{error}</p> : null}
+              </div>
+            ) : holding.door === "here" ? (
+              <DoorCode chainEventId={event.chainEventId} ticketId={ticketId} wallet={wallet} />
+            ) : (
+              <div className="flex max-w-[17ch] flex-col items-center gap-3 text-center">
+                <p className="text-xs text-paper/70">
+                  {holding.door === "none"
+                    ? "The door code needs this phone's key on the ticket first."
+                    : "The door key on this ticket belongs to another phone."}
+                </p>
+                <button
+                  type="button"
+                  onClick={bind}
+                  disabled={Boolean(busy)}
+                  className="rounded-full bg-marigold px-4 py-2 text-sm font-semibold text-ink disabled:opacity-60"
+                >
+                  {busy ? "Binding" : holding.door === "none" ? "Bind this phone" : "Move it to this phone"}
+                </button>
+                {error ? <p className="text-xs text-paper/70">{error}</p> : null}
+              </div>
+            )
+          }
+        />
 
-      <div className="mt-4 max-w-[640px]">
-        {holding.cancelled ? null : !confirming ? (
-          <button
-            type="button"
-            onClick={() => setConfirming(true)}
-            className="inline-flex items-center gap-2 text-sm font-medium text-ink-soft underline decoration-ink/30 underline-offset-4"
-          >
-            <ReturnIcon size={16} /> Cannot make it? Resell at face value
-          </button>
-        ) : torn ? null : (
-          <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="rounded-[4px] bg-paper-deep p-5">
-            <p className="font-semibold">Resell at face value for {event.title}?</p>
-            <p className="mt-1 text-sm text-ink-soft">
-              You get {formatUsdt(event.priceUsd)} back now. If someone is waiting, the seat becomes theirs in the same
-              transaction. This cannot be undone.
-            </p>
-            {error ? <p className="mt-3 text-sm font-medium text-reject">{error}</p> : null}
-            <div className="mt-4 flex gap-3">
-              <button
-                type="button"
-                onClick={handBack}
-                disabled={busy}
-                className="rounded-full bg-stamp px-5 py-2.5 text-sm font-semibold text-paper disabled:opacity-60"
-              >
-                {busy ? "Reselling" : `Resell for ${formatUsdt(event.priceUsd)}`}
-              </button>
-              <button type="button" onClick={() => setConfirming(false)} disabled={busy} className="px-3 text-sm font-medium">
-                Keep it
-              </button>
-            </div>
-          </motion.div>
-        )}
+        <div className="mt-4 max-w-[640px]">
+          {holding.cancelled ? null : !confirming ? (
+            <button
+              type="button"
+              onClick={() => {
+                playCue("tap");
+                setConfirming(true);
+              }}
+              disabled={Boolean(busy)}
+              className="inline-flex items-center gap-2 text-sm font-medium text-ink-soft underline decoration-ink/30 underline-offset-4 disabled:opacity-50"
+            >
+              <ReturnIcon size={16} /> Cannot make it? Resell at face value
+            </button>
+          ) : torn ? null : (
+            <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="rounded-[4px] bg-paper-deep p-5">
+              <p className="font-semibold">Resell at face value for {event.title}?</p>
+              <p className="mt-1 text-sm text-ink-soft">
+                You get {formatUsdt(event.priceUsd)} back now. If someone is waiting, the seat becomes theirs in the same
+                transaction. This cannot be undone.
+              </p>
+              {error ? <p className="mt-3 text-sm font-medium text-reject">{error}</p> : null}
+              <div className="mt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handBack}
+                  disabled={Boolean(busy)}
+                  className="rounded-full bg-stamp px-5 py-2.5 text-sm font-semibold text-paper disabled:opacity-60"
+                >
+                  {busy ? "Reselling" : `Resell for ${formatUsdt(event.priceUsd)}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playCue("tap");
+                    setConfirming(false);
+                  }}
+                  disabled={Boolean(busy)}
+                  className="px-3 text-sm font-medium"
+                >
+                  Keep it
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </div>
       </div>
     </li>
   );
@@ -338,24 +382,32 @@ function WaitingSpot({
   onChanged: (message: string) => void;
 }) {
   const { event, position, ahead } = holding;
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function leave() {
-    setBusy(true);
+    if (busy) return;
+    playCue("tap");
+    setBusy(holding.cancelled ? "Claiming refund" : "Leaving the waitlist");
+    setError(null);
     try {
       const signer = await paySigner();
+      playCue("step");
       if (holding.cancelled) await claimRefund(signer, event.chainEventId);
       else await leaveWaitlist(signer, event.chainEventId, position);
+      playCue("handback");
+      setBusy(null);
       onChanged(`You left the waitlist for ${event.title}. ${formatUsdt(event.priceUsd)} is back in your wallet.`);
     } catch (err) {
+      playCue("reject");
       setError(explainError(err));
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   return (
-    <li className="max-w-[640px] rounded-[4px] border border-ink/15 p-6">
+    <li className="relative max-w-[640px] rounded-[4px] border border-ink/15 p-6" aria-busy={Boolean(busy)}>
+      {busy ? <WorkingLock label={busy} detail="On-chain · do not leave this page" /> : null}
       <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-muted">
         Waitlist · {formatLongDate(event.startsAt, event.timezone)}
       </p>
@@ -375,8 +427,8 @@ function WaitingSpot({
         <Link href={`/e/${event.slug}/waitlist`} className="underline underline-offset-4">
           See the public line
         </Link>
-        <button type="button" onClick={leave} disabled={busy} className="text-ink-soft underline underline-offset-4">
-          {busy ? "Leaving" : holding.cancelled ? `Show cancelled. Claim ${formatUsdt(event.priceUsd)}` : "Leave and get a refund"}
+        <button type="button" onClick={leave} disabled={Boolean(busy)} className="text-ink-soft underline underline-offset-4 disabled:opacity-50">
+          {busy ? "Working…" : holding.cancelled ? `Show cancelled. Claim ${formatUsdt(event.priceUsd)}` : "Leave and get a refund"}
         </button>
       </div>
     </li>

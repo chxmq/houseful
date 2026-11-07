@@ -67,8 +67,8 @@ export default async function TryPage() {
             choose the <span className="font-semibold text-ink">simulator</span> if you do not have World App.
           </li>
           <li>
-            <span className="font-semibold text-ink">3. Pay</span> the face price. Use Pay now, or Pay with Ethereum if
-            you prefer.
+            <span className="font-semibold text-ink">3. Pay</span> — pick a wallet when asked, then confirm. Face price
+            is test USDT.
           </li>
           <li>
             <span className="font-semibold text-ink">4. Open My tickets</span> for the live door code, then try{" "}

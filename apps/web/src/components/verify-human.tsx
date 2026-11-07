@@ -3,12 +3,11 @@
 import {
   IDKitRequestWidget,
   proofOfHuman,
-  selfieCheck,
   type IDKitErrorCodes,
   type IDKitResult,
   type RpContext,
 } from "@worldcoin/idkit";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Assurance } from "@/lib/assurance";
 import { PersonCheckIcon } from "./icons";
 
@@ -41,6 +40,12 @@ type VerifyHumanProps = {
   onFailed: (failure: VerifyFailure) => void;
   /** Optional classes for the primary CTA. */
   className?: string;
+  /** When set, the visible button asks the parent to pick a wallet before verifying. */
+  onRequestStart?: () => void;
+  /** Start World / session attest as soon as this mounts (after a wallet was chosen). */
+  autoStart?: boolean;
+  /** Hide the CTA; parent owns the locked booking UI while World / attest runs. */
+  hideButton?: boolean;
 };
 
 function failureFromIdkit(code: IDKitErrorCodes): VerifyFailure {
@@ -86,16 +91,21 @@ export function VerifyHuman({
   eventId,
   wallet,
   purpose,
-  assurance,
   label,
   onVerified,
   onFailed,
   className = "",
+  onRequestStart,
+  autoStart = false,
+  hideButton = false,
 }: VerifyHumanProps) {
+  // `assurance` stays on the prop type for callers; /api/world/verify enforces the show bar.
+  // Staging simulator has no Selfie Check card, so the widget always asks Proof of Human.
   const [request, setRequest] = useState<WorldRequest | null>(null);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const settled = useRef(false);
+  const autoStarted = useRef(false);
 
   async function trySessionAttest(): Promise<"ok" | "fallback" | "failed"> {
     const res = await fetch("/api/attest", {
@@ -145,6 +155,14 @@ export function VerifyHuman({
     }
   }
 
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    void start();
+    // Intentionally once per mount after the parent chose a wallet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
+
   async function verifyOnServer(result: IDKitResult) {
     settled.current = true;
     const res = await fetch("/api/world/verify", {
@@ -162,19 +180,21 @@ export function VerifyHuman({
     onVerified(data as Attestation);
   }
 
-  const preset = assurance === "human" ? proofOfHuman({ signal: wallet.toLowerCase() }) : selfieCheck({ signal: wallet.toLowerCase() });
+  const preset = proofOfHuman({ signal: wallet.toLowerCase() });
 
   return (
     <>
-      <button
-        type="button"
-        onClick={start}
-        disabled={busy}
-        className={`inline-flex w-full items-center justify-center gap-3 rounded-full bg-stamp px-6 py-4 text-base font-semibold text-paper shadow-[0_12px_28px_-14px_rgba(226,64,27,0.9)] transition disabled:opacity-60 ${className}`}
-      >
-        <PersonCheckIcon />
-        {busy ? "Checking" : label}
-      </button>
+      {!hideButton ? (
+        <button
+          type="button"
+          onClick={onRequestStart && !autoStart ? onRequestStart : start}
+          disabled={busy}
+          className={`inline-flex w-full items-center justify-center gap-3 rounded-full bg-stamp px-6 py-4 text-base font-semibold text-paper shadow-[0_12px_28px_-14px_rgba(226,64,27,0.9)] transition disabled:opacity-60 ${className}`}
+        >
+          <PersonCheckIcon />
+          {busy ? "Checking" : label}
+        </button>
+      ) : null}
 
       {request ? (
         <IDKitRequestWidget
