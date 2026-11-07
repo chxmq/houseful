@@ -10,6 +10,7 @@ import { formatUsdt, formatLongDate } from "@/lib/format";
 import { seatCaption, type SeatId } from "@/lib/seat-layout";
 import {
   buyTicket,
+  canRetryWithSameAttestation,
   claimReturnedSeat,
   deviceSigner,
   ethPaymentsEnabled,
@@ -50,7 +51,12 @@ type Phase =
   | { name: "working"; done: Step[]; current: Step }
   | { name: "bought"; ticketId: number; seat: number; hash: string }
   | { name: "joined"; position: number; hash: string }
-  | { name: "failed"; failure: VerifyFailure | { kind: "chain"; message: string } };
+  | {
+      name: "failed";
+      failure: VerifyFailure | { kind: "chain"; message: string };
+      /** Unused attestation kept so Try again can retry payment without World again. */
+      attestation?: Attestation;
+    };
 
 export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   const { state, error, refresh } = useEventChain(event.chainEventId);
@@ -113,8 +119,20 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
       }
       refresh();
     } catch (err) {
-      setPhase({ name: "failed", failure: { kind: "chain", message: explainError(err) } });
+      setPhase({
+        name: "failed",
+        failure: { kind: "chain", message: explainError(err) },
+        attestation: canRetryWithSameAttestation(err) ? att : undefined,
+      });
     }
+  }
+
+  function tryAgain() {
+    if (phase.name === "failed" && phase.attestation) {
+      void onVerified(phase.attestation);
+      return;
+    }
+    setPhase({ name: "idle" });
   }
 
   return (
@@ -290,7 +308,10 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
             >
               <p className="font-semibold">{phase.failure.message}</p>
               <FailureNext kind={phase.failure.kind} assurance={event.assurance} />
-              <button type="button" onClick={() => setPhase({ name: "idle" })} className="mt-4 text-sm font-medium underline underline-offset-4">
+              {phase.attestation ? (
+                <p className="mt-2 text-sm text-ink-soft">Your verification is still good. Try again continues the payment.</p>
+              ) : null}
+              <button type="button" onClick={tryAgain} className="mt-4 text-sm font-medium underline underline-offset-4">
                 Try again
               </button>
             </motion.div>

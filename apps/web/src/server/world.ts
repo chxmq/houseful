@@ -139,10 +139,13 @@ export async function verifyWorldProof(
       signal: AbortSignal.timeout(12_000),
     });
   } catch {
-    throw new WorldVerificationError("world-unreachable", "Could not reach World to check the proof.");
+    throw new WorldVerificationError("world-unreachable", "World is not responding, try again");
   }
 
   const body = (await response.json().catch(() => ({}))) as VerifySuccessBody;
+  if (response.status >= 500) {
+    throw new WorldVerificationError("world-unreachable", "World is not responding, try again");
+  }
   if (!response.ok || body.success !== true) {
     throw new WorldVerificationError(
       "rejected-by-world",

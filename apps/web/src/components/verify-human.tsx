@@ -65,12 +65,20 @@ function failureFromIdkit(code: IDKitErrorCodes): VerifyFailure {
   }
 }
 
-function failureFromApi(data: { code?: string; error?: string }): VerifyFailure {
-  if (data.code === "already-holds") return { kind: "already-holds", message: data.error ?? "Already holds a place." };
+function failureFromApi(data: { code?: string; error?: string }, status?: number): VerifyFailure {
+  if (data.code === "already-holds") {
+    return {
+      kind: "already-holds",
+      message: data.error ?? "This person already holds a ticket or a waitlist place for this show.",
+    };
+  }
   if (data.code === "weak-credential" || data.code === "credential_unavailable") {
     return { kind: "no-credential", message: data.error ?? "Credential is not enough for this show." };
   }
   if (data.code === "signin") return { kind: "signin", message: data.error ?? "Sign in with World ID first." };
+  if (data.code === "world-unreachable" || (status != null && status >= 500)) {
+    return { kind: "unavailable", message: "World is not responding, try again" };
+  }
   return { kind: "rejected", message: data.error ?? "The proof did not check out." };
 }
 
@@ -104,7 +112,7 @@ export function VerifyHuman({
     if (res.status === 401 || data.code === "signin" || data.code === "weak-credential") {
       return "fallback";
     }
-    onFailed(failureFromApi(data));
+    onFailed(failureFromApi(data, res.status));
     return "failed";
   }
 
@@ -114,8 +122,11 @@ export function VerifyHuman({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ eventId }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      if (res.status >= 500) throw new Error("World is not responding, try again");
+      throw new Error(data.error || "World ID is not reachable right now.");
+    }
     setRequest(data);
     settled.current = false;
     setOpen(true);
@@ -128,7 +139,7 @@ export function VerifyHuman({
       if (session === "ok" || session === "failed") return;
       await startWorld();
     } catch (err) {
-      onFailed({ kind: "unavailable", message: (err as Error).message || "World ID is not reachable right now." });
+      onFailed({ kind: "unavailable", message: (err as Error).message || "World is not responding, try again" });
     } finally {
       setBusy(false);
     }
@@ -141,11 +152,11 @@ export function VerifyHuman({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ eventId, wallet, purpose, result }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       // Resolve the host check without throwing. IDKit treats a thrown error as
       // failed_by_host_app and replaces our already-holds / weak-credential copy.
-      onFailed(failureFromApi(data));
+      onFailed(failureFromApi(data, res.status));
       return;
     }
     onVerified(data as Attestation);

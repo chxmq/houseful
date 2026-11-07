@@ -61,12 +61,12 @@ const refusals: Refusal[] = [
   {
     name: "World's verify API refuses and says nothing",
     arrange: (world, worldVerify) => worldVerify.reject(world.person, { status: 500, code: null, detail: null }),
-    message: "World rejected the proof (HTTP 500).",
+    message: "World is not responding, try again",
   },
   {
     name: "World's verify API cannot be reached",
     arrange: (world, worldVerify) => worldVerify.unreachable(world.person),
-    message: "Could not reach World to check the proof.",
+    message: "World is not responding, try again",
   },
   {
     name: "World vouches for a different person than the proof names",

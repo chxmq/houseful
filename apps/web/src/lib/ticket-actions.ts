@@ -56,6 +56,15 @@ const friendly: Record<string, string> = {
   InsufficientEthForSwap: "Not enough Ethereum was sent to cover the ticket price.",
 };
 
+/** True when the same attestation can be submitted again (payment failed, proof not spent). */
+export function canRetryWithSameAttestation(err: unknown): boolean {
+  if (!(err instanceof BaseError)) return true;
+  const revert = err.walk((e) => e instanceof ContractFunctionRevertedError);
+  if (!(revert instanceof ContractFunctionRevertedError)) return true;
+  const name = revert.data?.errorName ?? "";
+  return name !== "AttestationSpent" && name !== "AttestationExpired" && name !== "InvalidAttestation" && name !== "NullifierUsed";
+}
+
 export function explainError(err: unknown): string {
   if (err instanceof BaseError) {
     const revert = err.walk((e) => e instanceof ContractFunctionRevertedError);
@@ -65,12 +74,31 @@ export function explainError(err: unknown): string {
         const seat = (revert.data?.args as unknown[] | undefined)?.[0];
         return seat != null ? `Seat ${seat} was just taken. Pick another.` : friendly.SeatTaken;
       }
-      return friendly[name] ?? `The contract refused: ${name || revert.shortMessage}`;
+      if (friendly[name]) return friendly[name];
+      return "The contract refused this step. Nothing was charged. Try again.";
     }
-    if (/insufficient funds/i.test(err.message)) return "This wallet does not have enough Ethereum for network fees.";
-    return err.shortMessage;
+    const text = `${err.shortMessage} ${err.message}`;
+    if (/user rejected|rejected the request|denied transaction|user denied/i.test(text)) {
+      return "The wallet prompt was cancelled. Nothing was charged.";
+    }
+    if (/insufficient funds/i.test(text)) return "This wallet does not have enough Ethereum for network fees.";
+    if (/ eth_sendTransaction|method not (found|supported)|does not exist|unsupported method/i.test(text)) {
+      return "This network could not send the transaction from the browser wallet. Try again.";
+    }
+    if (/failed to fetch|http request failed|timeout|timed out|econnrefused|network/i.test(text)) {
+      return "The network did not respond in time. Nothing was charged. Try again.";
+    }
+    if (/nonce too low|replacement transaction underpriced/i.test(text)) {
+      return "Another transaction from this wallet is still pending. Wait a moment, then try again.";
+    }
+    // Avoid dumping raw RPC jargon into the ticket panel.
+    const short = err.shortMessage?.replace(/^Execution reverted( with reason)?[:.]?\s*/i, "").trim();
+    if (short && !/0x[0-9a-f]{8}/i.test(short) && short.length < 160) return short;
+    return "The payment step failed. Nothing was charged. Try again.";
   }
-  return (err as Error)?.message ?? "Something went wrong.";
+  const message = (err as Error)?.message?.trim();
+  if (message && message.length < 160 && !/0x[0-9a-f]{64}/i.test(message)) return message;
+  return "Something went wrong. Nothing was charged. Try again.";
 }
 
 function requireContract() {
@@ -178,6 +206,17 @@ async function approveUsdt(signer: ActionSigner, amount: bigint) {
   });
   const hash = await signer.client.writeContract(request);
   await publicClient.waitForTransactionReceipt({ hash });
+  // Unichain public RPC can return the receipt before eth_call sees the new allowance.
+  for (let i = 0; i < 30; i++) {
+    const next = await publicClient.readContract({
+      address: token,
+      abi: usdtAbi,
+      functionName: "allowance",
+      args: [signer.address, spender],
+    });
+    if (next >= amount) return;
+    await new Promise((r) => setTimeout(r, 400));
+  }
 }
 
 const quoterV2Abi = [
