@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Assurance } from "@/lib/assurance";
 import { assuranceCopy } from "@/lib/assurance";
 import { explorerTx } from "@/lib/chain";
@@ -90,13 +90,8 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
   const mode = !state ? null : state.available > 0 ? (state.returned > 0 && state.available === state.returned ? "claim" : "buy") : "join";
   const credential = assuranceCopy[event.assurance];
   const seatReady = mode === "join" || seat !== null;
-
-  // A waitlist promotion on another phone should leave the "joined" panel.
-  useEffect(() => {
-    if (phase.name === "joined" && state?.mine.ticketId != null) {
-      setPhase({ name: "idle" });
-    }
-  }, [phase.name, state?.mine.ticketId]);
+  // Waitlist promotion: show the ticket panel instead of a stale "joined" state.
+  const view: Phase = phase.name === "joined" && state?.mine.ticketId != null ? { name: "idle" } : phase;
 
   async function onVerified(att: Attestation) {
     const chainId = event.chainEventId!;
@@ -191,7 +186,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
 
       <div className="mt-6">
         <AnimatePresence mode="wait" initial={false}>
-          {phase.name === "idle" && state ? (
+          {view.name === "idle" && state ? (
             <motion.div key="idle" exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.2 }}>
               {state.cancelled ? (
                 state.mine.ticketId != null ? (
@@ -270,11 +265,11 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
             </motion.div>
           ) : null}
 
-          {phase.name === "working" ? (
+          {view.name === "working" ? (
             <motion.div key="working" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
               <TicketMinting
-                done={phase.done}
-                current={phase.current}
+                done={view.done}
+                current={view.current}
                 title={event.title}
                 priceLabel={formatUsdt(event.priceUsd)}
                 seatLabel={seat != null ? seatCaption(seat) : undefined}
@@ -282,7 +277,7 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
             </motion.div>
           ) : null}
 
-          {phase.name === "bought" ? (
+          {view.name === "bought" ? (
             <motion.div key="bought" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <TicketPrint>
                 <TicketStub
@@ -291,10 +286,10 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                   lines={[
                     { label: "Venue", value: event.venue },
                     { label: "Paid", value: formatUsdt(event.priceUsd) },
-                    { label: "Seat", value: seatCaption(phase.seat) },
-                    { label: "Ticket", value: `No. ${String(phase.ticketId + 1).padStart(4, "0")}` },
+                    { label: "Seat", value: seatCaption(view.seat) },
+                    { label: "Ticket", value: `No. ${String(view.ticketId + 1).padStart(4, "0")}` },
                   ]}
-                  serial={`HSF-${event.chainEventId}-${phase.ticketId}`}
+                  serial={`HSF-${event.chainEventId}-${view.ticketId}`}
                   stub={<span className="font-display text-4xl font-black uppercase leading-none text-stamp">In</span>}
                 />
               </TicketPrint>
@@ -302,21 +297,21 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
                 <Link href="/tickets" className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-3 font-semibold text-paper">
                   Open your ticket <ArrowRight size={18} />
                 </Link>
-                <TxLink hash={phase.hash} />
+                <TxLink hash={view.hash} />
               </div>
             </motion.div>
           ) : null}
 
-          {phase.name === "joined" ? (
+          {view.name === "joined" ? (
             <motion.div key="joined" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-              <WaitlistSpot position={phase.position} slug={event.id} fresh />
+              <WaitlistSpot position={view.position} slug={event.id} fresh />
               <div className="mt-3">
-                <TxLink hash={phase.hash} />
+                <TxLink hash={view.hash} />
               </div>
             </motion.div>
           ) : null}
 
-          {phase.name === "failed" ? (
+          {view.name === "failed" ? (
             <motion.div
               key="failed"
               initial={{ opacity: 0, x: -6 }}
@@ -324,9 +319,9 @@ export function TicketPanel({ event }: { event: TicketPanelEvent }) {
               transition={{ duration: 0.45 }}
               className="rounded-[4px] border-l-[3px] border-stamp bg-paper-deep p-5"
             >
-              <p className="font-semibold">{phase.failure.message}</p>
-              <FailureNext kind={phase.failure.kind} assurance={event.assurance} />
-              {phase.attestation ? (
+              <p className="font-semibold">{view.failure.message}</p>
+              <FailureNext kind={view.failure.kind} assurance={event.assurance} />
+              {view.attestation ? (
                 <p className="mt-2 text-sm text-ink-soft">Your verification is still good. Try again continues the payment.</p>
               ) : null}
               <button type="button" onClick={tryAgain} className="mt-4 text-sm font-medium underline underline-offset-4">

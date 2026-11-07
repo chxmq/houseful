@@ -39,7 +39,8 @@ export const HOUSEFUL_LOGIN_ACTION = "houseful-login";
  * Checkout uses the same World action as login so one person yields one nullifier.
  * A per-show action would let the same human buy once signed in and again signed out.
  */
-export function worldActionFor(_eventId: string) {
+export function worldActionFor(eventId: string) {
+  void eventId;
   return HOUSEFUL_LOGIN_ACTION;
 }
 

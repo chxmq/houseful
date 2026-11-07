@@ -72,7 +72,6 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const settled = useRef(false);
-  const challenge = useRef("");
   const destination = safeNextPath(next, "/account");
 
   async function start() {
@@ -86,7 +85,6 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not start World ID.");
-      challenge.current = data.challenge;
       setRequest(data);
       settled.current = false;
       setOpen(true);
@@ -114,7 +112,7 @@ export function WorldLogin({ next = "/account", label = "Sign in with World ID" 
     router.refresh();
   }
 
-  const signal = request ? `houseful:login:${challenge.current}` : "";
+  const signal = request ? `houseful:login:${request.challenge}` : "";
   const preset = selfieCheck({ signal });
 
   return (

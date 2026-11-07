@@ -144,7 +144,8 @@ type EventRow = {
 };
 
 function baseEvent(e: typeof events.$inferSelect) {
-  const { createdAt: _createdAt, ...rest } = e;
+  const { createdAt, ...rest } = e;
+  void createdAt;
   return {
     ...rest,
     slug: e.id,
@@ -331,7 +332,10 @@ export async function trendingByCategory(
         .slice(0, opts.perCategory ?? 4),
     }))
     .sort((a, b) => b.sold - a.sold || b.eventCount - a.eventCount)
-    .map(({ sold: _sold, ...shelf }) => shelf);
+    .map(({ sold, ...shelf }) => {
+      void sold;
+      return shelf;
+    });
 }
 
 export type { EventCategory, EventStatus, HostKind, PosterInk };

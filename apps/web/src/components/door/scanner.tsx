@@ -50,7 +50,7 @@ const reasonCopy: Record<RejectReason, { title: string; detail: string; short: s
   },
   revoked: {
     title: "This code was replaced",
-    detail: "A newer code is on the holder's phone now — after a move, a hand-back, or a waitlist promotion. Ask to see the live ticket.",
+    detail: "A newer code is on the holder's phone now, after a move, a hand-back, or a waitlist promotion. Ask to see the live ticket.",
     short: "Replaced",
   },
   "wrong-event": {

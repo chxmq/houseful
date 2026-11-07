@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { shortHex } from "@/lib/format";
 import { deviceWallet } from "@/lib/device-wallet";
 import {
@@ -20,20 +20,20 @@ type Wallet = {
 
 const initial: AccountFormState = null;
 
+function readPhoneWallet(): `0x${string}` | null {
+  try {
+    return deviceWallet().address;
+  } catch {
+    return null;
+  }
+}
+
 export function AccountWallets({ linked }: { linked: Wallet[] }) {
-  const [phone, setPhone] = useState<`0x${string}` | null>(null);
+  const [phone] = useState(readPhoneWallet);
   const [linkState, linkAction, linkPending] = useActionState(linkWalletAction, initial);
   const [chooseState, chooseAction] = useActionState(chooseWalletAction, initial);
   const [delinkState, delinkAction, delinkPending] = useActionState(delinkWalletAction, initial);
   const error = linkState?.error ?? chooseState?.error ?? delinkState?.error;
-
-  useEffect(() => {
-    try {
-      setPhone(deviceWallet().address);
-    } catch {
-      setPhone(null);
-    }
-  }, []);
 
   const phoneLinked = phone ? linked.some((w) => w.address.toLowerCase() === phone.toLowerCase()) : true;
 
