@@ -32,7 +32,10 @@ async function readLedger(chainEventId: number): Promise<Ledger | null> {
   if (!contractAddress) return null;
   const address = contractAddress;
   const id = BigInt(chainEventId);
-  const info = await publicClient.readContract({ address, abi: housefulAbi, functionName: "getEventInfo", args: [id] });
+  const info = await Promise.race([
+    publicClient.readContract({ address, abi: housefulAbi, functionName: "getEventInfo", args: [id] }),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 10_000)),
+  ]);
 
   const waiters = [];
   for (let offset = 0n; offset < info.waitlistLength; offset += PAGE) {
@@ -48,15 +51,25 @@ async function readLedger(chainEventId: number): Promise<Ledger | null> {
 
   const left = new Set<number>();
   try {
-    const logs = await publicClient.getLogs({
-      address,
-      event: parseAbiItem("event WaitlistLeft(uint256 indexed eventId, uint256 indexed position, address indexed wallet)"),
-      args: { eventId: id },
-      fromBlock: 0n,
-    });
+    // Optional enrichment only. Never block the line on log RPC quirks.
+    const latest = await Promise.race([
+      publicClient.getBlockNumber(),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4_000)),
+    ]);
+    const fromBlock = latest > 20_000n ? latest - 20_000n : 0n;
+    const logs = await Promise.race([
+      publicClient.getLogs({
+        address,
+        event: parseAbiItem("event WaitlistLeft(uint256 indexed eventId, uint256 indexed position, address indexed wallet)"),
+        args: { eventId: id },
+        fromBlock,
+        toBlock: latest,
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), 4_000)),
+    ]);
     for (const log of logs) left.add(Number(log.args.position));
   } catch {
-    // Some public RPCs cap log ranges; without them a departed waiter reads as seated.
+    // Without Leave logs, a departed waiter may show as "Got a seat".
   }
 
   let prev = ZERO;
@@ -88,7 +101,10 @@ export function WaitlistLedger({ chainEventId }: { chainEventId: number }) {
 
   useEffect(() => {
     let live = true;
-    const load = () => readLedger(chainEventId).then((l) => live && setLedger(l));
+    const load = () =>
+      readLedger(chainEventId)
+        .then((l) => live && setLedger(l))
+        .catch(() => live && setLedger(null));
     load();
     const timer = setInterval(load, 8000);
     return () => {
@@ -101,7 +117,7 @@ export function WaitlistLedger({ chainEventId }: { chainEventId: number }) {
     return <p className="font-mono text-xs uppercase tracking-[0.16em] text-muted">Reading the line from the contract</p>;
   }
   if (ledger === null) {
-    return <p className="text-ink-soft">This network has no Houseful contract yet.</p>;
+    return <p className="text-ink-soft">Could not read the waitlist from the contract. Check the RPC and refresh.</p>;
   }
   if (ledger.rows.length === 0) {
     return (
