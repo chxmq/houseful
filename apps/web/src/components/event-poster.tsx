@@ -1,4 +1,5 @@
 import { formatDayNum, formatMonShort } from "@/lib/format";
+import { posterFontSize, posterLines } from "@/lib/poster-layout";
 
 type Ink = "stamp" | "marigold" | "ink" | "admit";
 
@@ -34,7 +35,8 @@ export function EventPoster({ title, subtitle, variant, ink, startsAt, timezone,
   const seed = hash(title);
   const day = formatDayNum(startsAt, timezone);
   const month = formatMonShort(startsAt, timezone);
-  const words = title.toUpperCase().split(/\s+/);
+  const lines = posterLines(title);
+  const titleSize = posterFontSize(lines);
   const tilt = ((seed % 7) - 3) * 1.5;
 
   return (
@@ -61,11 +63,11 @@ export function EventPoster({ title, subtitle, variant, ink, startsAt, timezone,
           ) : null}
           <h3
             className="font-display font-black uppercase leading-[0.82] tracking-[-0.01em]"
-            style={{ fontSize: words.some((w) => w.length > 9) ? "13cqw" : "17cqw" }}
+            style={{ fontSize: `${titleSize.toFixed(2)}cqw` }}
           >
-            {words.map((word, i) => (
-              <span key={`${word}-${i}`} className="block" style={i === 1 && variant % 3 === 0 ? { color: p.accent } : undefined}>
-                {word}
+            {lines.map((line, i) => (
+              <span key={`${line}-${i}`} className="block" style={i === 1 && variant % 3 === 0 ? { color: p.accent } : undefined}>
+                {line}
               </span>
             ))}
           </h3>
