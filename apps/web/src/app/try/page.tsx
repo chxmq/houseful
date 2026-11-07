@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   description: "Scan to buy a real testnet ticket. World ID simulator works without World App.",
 };
 
+/** Booth page reads the live catalog and deployment URL; do not prerender it cold. */
+export const instant = false;
+
 const DEMO_SLUG = process.env.NEXT_PUBLIC_DEMO_SLUG ?? "the-last-local-nsci-dome";
 
 function appOrigin() {

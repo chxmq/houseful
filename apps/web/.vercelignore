@@ -1,0 +1,13 @@
+.next
+.e2e
+test-results
+playwright-report
+coverage
+/data
+*.db
+*.db-*
+tsconfig.tsbuildinfo
+.env*.local
+node_modules
+/e2e
+/test

@@ -1,14 +1,23 @@
 # Hosting
 
-## Blocked without credentials
+## Your steps (once)
 
-`vercel whoami` has no login on this machine. Deploy needs `vercel login` (or a token) and a Turso database.
+```sh
+vercel login
+# and, if needed:
+curl -sSfL https://get.tur.so/install.sh | bash
+source ~/.zshrc
+turso auth login
+```
 
-## Ready to wire
+Turso CLI is already installed at `~/.turso/turso` on this machine. Vercel CLI is present. Both still need login.
 
-1. Create a Turso DB, copy `libsql://…` into `DATABASE_URL` and the token into `DATABASE_AUTH_TOKEN`.
-2. From `apps/web`: `pnpm exec drizzle-kit push --force` against that DB, then seed.
-3. Set Vercel project root to `apps/web` (see `vercel.json`). Paste the same env vars as `.env.local` for 1301, plus `NEXT_PUBLIC_APP_URL`.
-4. `vercel --prod` from `apps/web` after login.
+## Agent steps after login
 
-Live Unichain Houseful: see `packages/contracts/deployments/1301.json`.
+1. `turso db create houseful` (or reuse) and mint a DB token.
+2. Push schema + seed against that Turso URL from `apps/web`.
+3. Link / create the Vercel project with root `apps/web`.
+4. Set production env for Unichain 1301 and `0x8F9A0dfb0BC16526FB4df5d9774ea6D6e2aBa98e` (same values as local `.env.local`, plus `NEXT_PUBLIC_APP_URL`).
+5. `vercel --prod` from `apps/web`, open the live URL on a phone, buy one ticket, report the URL.
+
+Live Unichain Houseful: see `packages/contracts/deployments/1301.json` (`eventCount` was 19 at last check).
