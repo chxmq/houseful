@@ -40,11 +40,11 @@ PENDING(world-live): a production credential run, a complete post-verification p
 
 Transfers and approvals revert. The ordinary redistribution path is surrender before a cutoff, with a face-value USDT refund and promotion of the oldest active waiter, or a returned-ticket claim. The contract provides no price-setting transfer market.
 
-This does not prevent off-platform sales of a wallet key, a device, a smart-account controller or a rented identity. Wallet and holder keys are exportable from browser storage. A holder signature proves access to a key, not that the original verified person is at the door. A sold key can also be used to surrender or rebind a ticket.
+This does not prevent off-platform sales of a device, a smart-account controller or a rented identity. The app no longer offers wallet-key export/import. Keys still exist in browser localStorage, so device access or XSS can still expose them. A holder signature proves access to a key, not that the original verified person is at the door.
 
 Contract recovery requires a matching ticket nullifier and a recovery attestation for the receiving wallet. It bumps generation and clears the door key. The fan-session `/api/attest` endpoint can issue a recovery signature, while the event-proof endpoint still accepts only buy, join and claim. PENDING(recovery): there is no complete recovery UI or demonstrated identity continuity from every purchase path. Do not promise that a lost wallet can be recovered or that a sold key is worthless.
 
-The UI does provide wallet-key export and import. Losing both the key and its backup can strand wallet-controlled refunds, waitlist deposits or host proceeds. Importing the wallet key onto another phone restores wallet control, but a new door key must be bound for that phone. Browser storage is not encrypted by the application. PENDING(key-storage-hardening).
+Losing the device wallet (cleared storage, new browser) can strand refunds, waitlist deposits or host proceeds until World-proven recovery ships. Browser storage is not encrypted by the application. PENDING(key-storage-hardening). PENDING(recovery-ui).
 
 ## Screenshots, relays and offline revocation
 

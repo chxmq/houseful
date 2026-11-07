@@ -52,7 +52,7 @@ Search uses URL parameters for text, city, category, date, maximum price and sor
 
 `/tickets` requests past and upcoming rows for every catalog city so expired shows can still expose refund actions. It finds holdings across the catalog, but is not an index of arbitrary chain events. PENDING(wallet-discovery): tickets for uncataloged events still need a discovery path.
 
-The active checkout and ticket-wallet signer remains the generated device wallet. Its private key and the separate ed25519 door key are in localStorage. The backup UI exports and imports the wallet key; it does not restore a lost key using identity. When an account has an active linked wallet, `paySigner` in `pay-signer.ts` signs with it through an injected browser wallet, and with the device wallet when that is the active one.
+The active checkout and ticket-wallet signer remains the generated device wallet. Its private key and the separate ed25519 door key are in localStorage. There is no key export/import UI. `ActionSigner` supports an external signer shape for linked browser wallets.
 
 ## Accounts and sessions
 

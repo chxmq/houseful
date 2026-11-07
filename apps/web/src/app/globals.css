@@ -13,7 +13,7 @@
   --color-admit: #0f5a4a;
   --color-reject: #b8300f;
 
-  --font-display: var(--font-big-shoulders), "Arial Narrow", sans-serif;
+  --font-display: "Big Shoulders", "Arial Narrow", sans-serif;
   --font-sans: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 

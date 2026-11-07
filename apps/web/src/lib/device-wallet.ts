@@ -26,16 +26,6 @@ export function deviceWallet() {
   return { account, client, address: account.address };
 }
 
-export function exportDeviceWallet(): Hex {
-  return loadOrCreateKey();
-}
-
-export function importDeviceWallet(key: string): Hex {
-  if (!/^0x[0-9a-f]{64}$/i.test(key)) throw new Error("That does not look like a Houseful wallet key.");
-  window.localStorage.setItem(STORAGE_KEY, key);
-  return key as Hex;
-}
-
 export async function ensureFunded(address: `0x${string}`, needWei: bigint) {
   const balance = await publicClient.getBalance({ address });
   if (balance >= needWei) return balance;
