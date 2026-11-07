@@ -26,12 +26,14 @@ const refusals: Refusal[] = [
   {
     name: "the person has no Selfie Check yet",
     arrange: (world) => void world.failWith("credential_unavailable", { once: true }),
-    message: "Your World ID does not have a Selfie Check yet.",
+    message:
+      "World could not issue a Proof of Human for this request. In the simulator keep World ID 4.0 and Human selected.",
   },
   {
     name: "World App says World ID 4 is not available to the person",
     arrange: (world) => void world.failWith("world_id_4_not_available", { once: true }),
-    message: "Your World ID does not have a Selfie Check yet.",
+    message:
+      "World could not issue a Proof of Human for this request. In the simulator keep World ID 4.0 and Human selected.",
   },
   {
     name: "World App does not answer in time",

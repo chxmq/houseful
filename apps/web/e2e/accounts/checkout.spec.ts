@@ -3,7 +3,7 @@
  * checkout opens no World prompt. A fan who is not signed in is asked at checkout. One person gets one place per show,
  * whichever phone they buy on.
  */
-import { buyTicket, choosePay, openShow, pickSeat, refusal } from "../chain/helpers";
+import { buyTicket, choosePay, chooseWallet, openShow, pickSeat, refusal } from "../chain/helpers";
 import { hostPhone, listShow } from "../chain/host";
 import { signInFan } from "../support/auth";
 import { test, expect } from "../support/fixtures";
@@ -64,7 +64,8 @@ test("the same person is refused a second place for a show on another phone", as
   await openShow(second.page, show.slug);
   await pickSeat(second.page);
   await choosePay(second.page, "usdt");
-  await second.page.getByRole("button", { name: "Get tickets" }).click();
+  await second.page.getByRole("button", { name: /^Buy ticket/ }).click();
+  await chooseWallet(second.page);
 
   await expect(refusal(second.page)).toHaveText("This person already holds a ticket or a waitlist place for this show.");
   await expect(second.page.getByText("Each person gets one ticket or one waitlist place per show.")).toBeVisible();

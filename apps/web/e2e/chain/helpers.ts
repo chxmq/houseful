@@ -13,16 +13,28 @@ export async function openShow(page: Page, slug: string) {
 /** Takes general admission when `seat` is left out, or the seat with that number. */
 export async function pickSeat(page: Page, seat?: number) {
   if (seat === undefined) {
-    await page.getByRole("button", { name: "Continue without a seat" }).click();
+    const standing = page.getByRole("button", { name: /Continue · standing|Continue without a seat/ });
+    if (await standing.isVisible().catch(() => false)) {
+      await standing.click();
+      return;
+    }
+    // Seated demo shows: pick the first free seat if the caller omitted a number.
+    await page.getByRole("button", { name: /^Seat \d+$/ }).first().click();
     return;
   }
   await page.getByRole("button", { name: `Seat ${seat}`, exact: true }).click();
   await expect(page.getByText(`Seat ${seat} selected`)).toBeVisible();
 }
 
-/** USDT is "Pay now". "Pay with Ethereum" swaps the ETH for the face value inside the same transaction. */
-export async function choosePay(page: Page, method: "usdt" | "eth") {
-  await page.getByRole("button", { name: method === "usdt" ? "Pay now" : "Pay with Ethereum" }).click();
+/** Checkout is USDT-only in the UI. Kept so older specs still compile. */
+export async function choosePay(_page: Page, _method: "usdt" | "eth" = "usdt") {
+  // no-op
+}
+
+/** After Get tickets / Join, pick a wallet from the pay sheet. */
+export async function chooseWallet(page: Page) {
+  await expect(page.getByRole("heading", { name: "Pay with which wallet?" })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: /^(This phone|Linked wallet)/ }).first().click();
 }
 
 /** The words the panel shows when a purchase did not go through. */
@@ -39,13 +51,15 @@ async function expectDoneOrRefused(page: Page, done: Locator) {
 
 /** Clicks the buy button of a show with seats left and waits for the ticket. */
 export async function buyTicket(page: Page) {
-  await page.getByRole("button", { name: /^Get (tickets|Seat \d+)$/ }).click();
+  await page.getByRole("button", { name: /^(Buy |Get |Take )/ }).click();
+  await chooseWallet(page);
   await expectDoneOrRefused(page, page.getByRole("link", { name: "Open your ticket" }));
 }
 
 /** Clicks the button of a sold out show and waits for a place in line. */
 export async function joinWaitlist(page: Page) {
-  await page.getByRole("button", { name: "Join the waitlist" }).click();
+  await page.getByRole("button", { name: /Join waitlist/i }).click();
+  await chooseWallet(page);
   await expectDoneOrRefused(page, page.getByText("You are on the waitlist"));
 }
 

@@ -6,7 +6,7 @@
 import { signInFan } from "../support/auth";
 import { test, expect } from "../support/fixtures";
 import { deviceWalletAddress, expectNoHorizontalScroll } from "../support/page";
-import { buyTicket, choosePay, openShow, openTickets, pickSeat, refusal } from "./helpers";
+import { buyTicket, choosePay, chooseWallet, openShow, openTickets, pickSeat, refusal } from "./helpers";
 import { hostPhone, listShow } from "./host";
 
 test.describe("seat and pay", () => {
@@ -29,37 +29,16 @@ test.describe("seat and pay", () => {
     });
     expect(bought.args.eventId).toBe(BigInt(show.chainEventId));
     expect(bought.args.seat).toBe(7);
-    // Paid with the plain button: the buy function, no ETH sent, and the face value in the contract's USDT ledger.
-    expect(await chain.callOf(bought.transactionHash)).toEqual({ functionName: "buy", ethSent: 0n });
+    // Demo checkout always uses buyWithEth so the Uniswap swap is visible on the receipt.
+    const call = await chain.callOf(bought.transactionHash);
+    expect(call.functionName).toBe("buyWithEth");
+    expect(call.ethSent).toBeGreaterThan(0n);
     expect((await chain.read.ledger(show.chainEventId)).proceeds).toBe(show.price);
 
     // The wallet page shows the seat as well.
     await openTickets(page);
     await expect(page.getByText("Seat 7", { exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, { soft: true });
-  });
-
-  test("another fan pays in ETH through the swap", async ({ page, world, device, chain }) => {
-    const show = await listShow((await hostPhone(device)).page, chain, { seated: true, capacity: 12 });
-
-    await signInFan(page, world);
-    await openShow(page, show.slug);
-    await pickSeat(page, 3);
-    await choosePay(page, "eth");
-    await buyTicket(page);
-    await expect(page.getByText("Seat 3", { exact: true })).toBeVisible();
-
-    const fan = await deviceWalletAddress(page);
-    const bought = await chain.waitForEvent({
-      eventName: "TicketBought",
-      where: (log) => log.args.owner?.toLowerCase() === fan.toLowerCase(),
-    });
-    expect(bought.args.seat).toBe(3);
-    // Paid with the swap button: the ETH function, ETH sent along, and the swap still put the exact face value in the ledger.
-    const call = await chain.callOf(bought.transactionHash);
-    expect(call.functionName).toBe("buyWithEth");
-    expect(call.ethSent).toBeGreaterThan(0n);
-    expect((await chain.read.ledger(show.chainEventId)).proceeds).toBe(show.price);
   });
 
   test("a seat that was just taken is refused in plain words", async ({ page, world, device, chain }) => {
@@ -78,7 +57,8 @@ test.describe("seat and pay", () => {
     await buyTicket(rival.page);
 
     // The fan pays for the seat the page still shows as free.
-    await page.getByRole("button", { name: "Get Seat 5" }).click();
+    await page.getByRole("button", { name: /^Buy Seat 5/ }).click();
+    await chooseWallet(page);
     await expect(refusal(page)).toHaveText("Seat 5 was just taken. Pick another.");
     const fan = await deviceWalletAddress(page);
     expect(await chain.read.ticketOf(show.chainEventId, fan)).toBeNull();

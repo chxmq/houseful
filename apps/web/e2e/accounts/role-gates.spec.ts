@@ -8,14 +8,19 @@ import { test, expect } from "../support/fixtures";
 import { accountMenu } from "./account-page";
 
 test.describe("signed out", () => {
-  const fanPages = [
-    { path: "/tickets", next: "%2Ftickets" },
-    { path: "/account", next: "%2Faccount" },
-  ];
+  // /tickets reads the paying wallet; booth demos need it without a fan cookie.
+  // /account still requires World ID.
+  const fanPages = [{ path: "/account", next: "%2Faccount" }];
   const hostPages = [
     { path: "/host", next: "%2Fhost" },
     { path: "/host/new", next: "%2Fhost%2Fnew" },
   ];
+
+  test("/tickets opens without a fan session and reads this phone's wallet", async ({ page }) => {
+    await page.goto("/tickets");
+    await expect(page).toHaveURL(/\/tickets$/);
+    await expect(page.getByRole("heading", { name: "Your tickets", level: 1 })).toBeVisible();
+  });
 
   for (const { path, next } of fanPages) {
     test(`${path} sends a visitor to the fan sign-in and says why`, async ({ page }) => {
@@ -34,15 +39,6 @@ test.describe("signed out", () => {
       await expect(page.getByText("Sign the host challenge with your wallet.")).toBeVisible();
     });
   }
-
-  test("a fan who signs in from the wallet page lands on the wallet page", async ({ page }) => {
-    await page.goto("/tickets");
-    await expect(page).toHaveURL(/\/login\?next=%2Ftickets&reason=signin$/);
-    await page.getByRole("button", { name: "Sign in with World ID" }).click();
-
-    await expect(page).toHaveURL(/\/tickets$/);
-    await expect(page.getByRole("heading", { name: "Your tickets", level: 1 })).toBeVisible();
-  });
 
   test("a host who signs in from the listing form lands on the listing form", async ({ page, wallet }) => {
     await wallet();
@@ -70,14 +66,12 @@ test.describe("signed in as the other role", () => {
     await expect(page.getByRole("heading", { name: "You", level: 1 })).toBeVisible();
   });
 
-  test("a host never reaches the wallet page or the account page", async ({ page }) => {
+  test("a host never reaches the account page", async ({ page }) => {
     await signInHost(page);
 
-    for (const path of ["/tickets", "/account"]) {
-      await page.goto(path);
-      await expect(page).not.toHaveURL(new RegExp(`${path}$`));
-      await expect(page.getByRole("heading", { name: /^(Your tickets|You)$/, level: 1 })).toHaveCount(0);
-    }
+    await page.goto("/account");
+    await expect(page).not.toHaveURL(/\/account$/);
+    await expect(page.getByRole("heading", { name: "You", level: 1 })).toHaveCount(0);
     // The host is still signed in as a host.
     await expect(accountMenu(page).getByRole("link", { name: "Host console" })).toBeVisible();
   });
@@ -87,13 +81,6 @@ test.describe("signed in as the other role", () => {
     await page.goto("/host");
 
     await expect(page.getByText("That session is a fan World ID. Sign in here with the host wallet.")).toBeVisible();
-  });
-
-  test("a host sent away from /tickets is told it is a host session", async ({ page }) => {
-    await signInHost(page);
-    await page.goto("/tickets");
-
-    await expect(page.getByText("That session is a host wallet. Sign in here as a fan.")).toBeVisible();
   });
 });
 
