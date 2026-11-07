@@ -1,0 +1,43 @@
+Read-only, HEAD 7c6c6da. Nothing run: test names are read, not executed; apps/web has no test files. `[docs]` = docs.world.org; `[inference]` = unconfirmed in code. Bugs go to Cursor, unfixed. Root `~/ethglobal-mumbai/houseful`: `Houseful.sol` in packages/contracts/contracts, pass files in packages/pass/src, the rest under apps/web/src.
+
+## Attackers
+
+**Scalper, many wallets.** Stops: nullifier check (Houseful.sol:538,544), "allows one ticket per human per event even across two wallets". Not: bugs 1, 2. Left: sale-open bots [inference]; staging default (env.ts:19) allows simulator identities [inference].
+
+**Rented World ID.** Stops: one ticket per identity per show. Not: proof binds only the wallet (world.ts:89-93), door payload has no nullifier (credential.ts:16-28), so the renter never reappears. Left: rental per show, nullifiers being action-scoped (assurance.ts:34-36).
+
+**Selling key or device.** Stops: transfers revert (Houseful.sol:381-403), "a marketplace selling at 5x face value cannot move the ticket". Not: key is plaintext localStorage (device-wallet.ts:12-15); buyer calls setDoorKey (Houseful.sol:324-330) and /api/pass only compares owner to a body field (pass/route.ts:35). Contracts can hold tickets (Houseful.test.ts:710-713), so a sellable smart account works [inference]. Left: buyer risk only; seller can surrender before cutoff or re-key anytime. "No resale margin" is false (how-it-works/page.tsx:26, assurance.ts:12).
+
+**Screenshot.** Rotation 20s (constants.ts:1), tolerance one window either side (constants.ts:3, verifier.ts:63). Taken at second x of a window, it lives 40-x seconds: 20 to 40s on a correct clock. Stops: "a screenshot replayed %i seconds later is stale", "the same device rejects the replay". Not: "KNOWN LIMIT: a screenshot replayed inside the window on a fresh device is admitted". Devices never share admissions (scanner.tsx:326,339), so a live relay beats a second door anytime, helped by Copy and paste (door-code.tsx:126, scanner.tsx:740-773). Holders can presign future windows offline (payload.ts:73-94), 180 codes an hour. Left: copy overclaims (tickets/page.tsx:32, e/[slug]/page.tsx:125); phones over 20s off start failing, 40s always, labelled a screenshot (scanner.tsx:40).
+
+**Unsynced door.** Stops: never-synced device cannot scan (scanner.tsx:311,448). Not: "KNOWN LIMIT: an unsynced scanner admits the surrendered generation". Left: holder refunds, enters free, real holder refused ("tracks admission per ticket, so a surrender after entry cannot admit a second person"). Resync every 2 min online; 30 min warning, no block (scanner.tsx:34-35,582). setDoorKey has no cutoff.
+
+**Malicious host.** Stops: "exposes no function that can change an event's policy", "refunds remain available after endsAt and cannot be blocked by host or platform"; escrow unreachable (Houseful.sol:369-377); cancel and withdraw are time-exclusive (Houseful.sol:336,372). Not: a no-show is paid at endsAt, no dispute window (Houseful.sol:372); only the host cancels (Houseful.sol:333), so a vanished host means no refund after cutoff; postponing still unlocks at old endsAt. Seat holding via rented IDs costs only rental and gas. Capacity unchecked against venue (actions.ts:45-46). Left: listShow has no review; the hash proves consistency, not truth, so any title, venue or host name lists (actions.ts:20-48).
+
+**Door staff.** Stops: cannot forge ("rejects a credential self-issued with an attacker issuer key"). Not: scanner is advisory, /door has no login (door/[slug]/page.tsx:17), Reset wipes admissions (scanner.tsx:391-397), device clock is trusted (scanner.tsx:336). Left: no audit; logs stay local, recordAdmission has no app caller (humans.ts:83).
+
+**Compromised keys.** Attester: fake humans fill seats and line, later surrendered at gas cost; cannot take money, payouts go to msg.sender (Houseful.sol:261,298,364). "old attestations stop working once the verifier is rotated"; fake seats stay. Owner: setVerifier only (Houseful.sol:171), no funds; can halt sales or renounce. Door issuer: forges any ticket and generation, minted unchecked (verifier.ts:53-71); one key for all shows (env.ts:12), unpinned (scanner.tsx:312-320). Left: all share one server env; seeded hosts use the faucet key (seed-chain.ts:24); the only recorded deployment is local with a public Hardhat verifier (packages/contracts/deployments/31337.json, .env.example:19-20).
+
+**Faucet.** Stops: 60s per address, in memory (faucet/route.ts:19-23). Not: fresh addresses pass; no budget, auth or IP limit; no test. Left: bug 6.
+
+**Attestation replay.** Stops: "rejects an attestation issued to a different wallet", plus purpose, event, chain, contract variants; 15 min TTL (attest.ts:7). Not: no nonce, so after freeing the nullifier (Houseful.sol:259,276) the same wallet reuses the signature; alreadyUsed is ignored (verify/route.ts:61-69, humans.ts:25). Left: bug 4.
+
+**Waitlist.** Stops: "skips waiters who left"; no reorder or evict function; promotion is atomic (Houseful.sol:281-288). Not: the server can refuse attestations (verify/route.ts:71) and the head chain cannot show it. Left: tx ordering [inference]; joining an empty line then surrender is a directed sale.
+
+**Reentrancy.** Stops: nonReentrant on paying functions, state before send (Houseful.sol:252,267,343,369), "re-entering claimRefund from the refund callback fails and pays only once", plus surrender and leaveWaitlist equivalents. Left: nothing found; withdrawProceeds has no re-entry test.
+
+**Catalog or DB tampering.** Stops: passes read chain (pass/route.ts:30-33); listing checked at insert (actions.ts:36-43). Not: hash never rechecked (only actions.ts:37); seeded shows commit zero (seed-chain.ts:98). Left: edits change what buyers read and which chainEventId is attested (verify/route.ts:71-72); a new slug means a new nullifier and second ticket [inference].
+
+**Lost wallet.** Yes, stuck. No export or recovery; owner checks block surrender, refund, rebind, leave (Houseful.sol:272,347,326,257). Cancelled refunds and waiter escrow stay forever (no sweep, Houseful.test.ts:170-185); uncancelled face value goes to the host (Houseful.sol:375). Nullifier stays used, so no rebuy (verify/route.ts:52-58). A lost host wallet strands proceeds and cancel. device-wallet.ts:20 is false.
+
+## Bugs
+
+1. **Critical [docs].** POST /api/world/verify with responses `[fake item: any nullifier, signal_hash of any wallet; one real proof]`. Server takes the first item (world.ts:90,116), checks only `success` (world.ts:108), and World's 200 means "At least one proof verified successfully". Result: attestation for an invented nullifier, unlimited tickets from one person. Not exercised. Read per-item `results`.
+2. **High.** Assurance is browser-only (verify-human.tsx:111); server never compares credential (verify/route.ts:37, world.ts:117). A Selfie proof buys a Proof of Human show.
+3. **High.** /tickets reads upcoming Mumbai shows only (tickets/page.tsx:11, catalog.ts:170,205). After endsAt, waiter escrow and unclaimed cancelled refunds vanish from the UI though the contract pays.
+4. **Medium.** One attestation loops join and leave, adding dead slots. `_nextWaiter` (Houseful.sol:559) cannot resume; about 13,000 slots exceed 30M gas [inference]. Once the cursor arrives, every surrender reverts permanently.
+5. **Medium.** Public sync makes 1+minted unbatched RPC calls per GET (sync/route.ts:62-71, server/chain.ts:10); failures are swallowed (scanner.tsx:284-289). Hammering it leaves doors silently stale.
+6. **Medium.** send demands a 0.002 ETH floor through the faucet first (ticket-actions.ts:68, device-wallet.ts:38-41). A drained faucet blocks refunds despite enough gas. Drip 0.02 ETH fails fresh wallets above ₹5,400 (faucet/route.ts:8, event-draft.ts:19).
+7. **Medium, public deploys.** seed-chain.ts:74-76 skips existing ids: whoever calls createEvent first hosts that catalog row and takes proceeds.
+8. **Low.** Direct createEvent with a past cutoff lists fine (Houseful.sol:179, client check show-form.tsx:78-82); hand-back never opens while Rule 3 promises it.
+9. **Low.** Listing again renames the host on sold shows (actions.ts:60). Refunded waiter shows "Got a seat" (waitlist-ledger.tsx:69, Houseful.sol:363). Phone moves display "returned seat"; "One verified person" is unproven (scanner.tsx:853-855). Door never learns of cancellation (sync/route.ts:73-86). Wallet needs RPC before rendering the cached pass (ticket-wallet.tsx:85-89,115-116).
