@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" role="img" aria-label="Devcon Mumbai poster">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#071526"/>
+      <stop offset="55%" stop-color="#0B2A4A"/>
+      <stop offset="100%" stop-color="#0E5C5A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2EE6A6"/>
+      <stop offset="100%" stop-color="#62D6FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#bg)"/>
+  <g opacity="0.35" stroke="#62D6FF" stroke-width="1.5" fill="none">
+    <path d="M0 180 H800"/><path d="M0 220 H800"/><path d="M0 780 H800"/><path d="M0 820 H800"/>
+    <path d="M120 0 V1000"/><path d="M680 0 V1000"/>
+  </g>
+  <g transform="translate(400 310)" fill="none" stroke="url(#accent)" stroke-width="10">
+    <path d="M0 -120 L104 -60 L104 60 L0 120 L-104 60 L-104 -60 Z"/>
+    <path d="M0 -70 L0 70" stroke-width="8"/>
+    <path d="M-52 -30 L0 0 L52 -30" stroke-width="8"/>
+    <path d="M-52 30 L0 0 L52 30" stroke-width="8"/>
+  </g>
+  <text x="400" y="520" text-anchor="middle" fill="#F4FBFF" font-family="Arial Black, Helvetica, sans-serif" font-size="118" font-weight="900" letter-spacing="8">DEVCON</text>
+  <rect x="250" y="555" width="300" height="6" fill="url(#accent)"/>
+  <text x="400" y="620" text-anchor="middle" fill="#2EE6A6" font-family="Courier New, monospace" font-size="28" letter-spacing="10">MUMBAI · NSCI DOME</text>
+  <text x="400" y="880" text-anchor="middle" fill="#9EC7D8" font-family="Courier New, monospace" font-size="22" letter-spacing="6">TEST TICKET · ONE HUMAN</text>
+  <text x="400" y="930" text-anchor="middle" fill="#F4FBFF" font-family="Arial Black, Helvetica, sans-serif" font-size="36" letter-spacing="4">HOUSEFUL</text>
+</svg>

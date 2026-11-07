@@ -12,6 +12,8 @@ type EventPosterProps = {
   timezone?: string;
   venue: string;
   className?: string;
+  /** Full-bleed custom art (e.g. Devcon). */
+  imageSrc?: string | null;
 };
 
 const palettes: Record<Ink, { bg: string; fg: string; accent: string }> = {
@@ -30,7 +32,7 @@ function hash(input: string) {
   return h >>> 0;
 }
 
-export function EventPoster({ title, subtitle, variant, ink, startsAt, timezone, venue, className = "" }: EventPosterProps) {
+export function EventPoster({ title, subtitle, variant, ink, startsAt, timezone, venue, className = "", imageSrc }: EventPosterProps) {
   const p = palettes[ink];
   const seed = hash(title);
   const day = formatDayNum(startsAt, timezone);
@@ -38,6 +40,25 @@ export function EventPoster({ title, subtitle, variant, ink, startsAt, timezone,
   const lines = posterLines(title);
   const titleSize = posterFontSize(lines);
   const tilt = ((seed % 7) - 3) * 1.5;
+
+  if (imageSrc) {
+    return (
+      <div
+        className={`relative aspect-[4/5] overflow-hidden bg-[#071526] [container-type:inline-size] ${className}`}
+        role="img"
+        aria-label={`Poster for ${title}`}
+      >
+        <img src={imageSrc} alt="" className="absolute inset-0 size-full object-cover" />
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between bg-gradient-to-t from-black/70 to-transparent p-[6cqw] pt-[18cqw] text-[#f4fbff]">
+          <span className="font-mono text-[3.2cqw] uppercase tracking-[0.14em]">{venue}</span>
+          <span className="text-right font-mono text-[3.2cqw] uppercase leading-none tracking-[0.14em]">
+            <span className="block font-display text-[11cqw] font-extrabold tracking-normal">{day}</span>
+            {month}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

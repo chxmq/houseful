@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { EventPoster } from "@/components/event-poster";
+import { posterImageFor } from "@/lib/poster-art";
 import { CalendarIcon, PinIcon } from "@/components/icons";
 import { RiseText } from "@/components/motion/reveal";
 import { SiteFooter } from "@/components/site-footer";
@@ -37,14 +38,6 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
       <SiteHeader city={{ slug: e.citySlug, name: e.city?.name ?? e.citySlug }} />
 
       <main id="main" className="flex-1">
-        <aside className="border-b border-ink/20 px-5 py-4 text-sm md:px-8" aria-label="Test listing">
-          <div className="mx-auto max-w-[1256px]">
-            <p>Test listing, not affiliated with the artist or organiser. A booking here does not give real admission.</p>
-            {e.officialUrl ? (
-              <a href={e.officialUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block py-1 font-medium underline">Official event and tickets (opens a new tab)</a>
-            ) : <p className="mt-1 text-muted">This is a sample show created for testing.</p>}
-          </div>
-        </aside>
         <div className="relative overflow-hidden border-b border-ink/10 bg-ink text-paper">
           <div className="relative mx-auto grid w-full max-w-[1320px] gap-10 px-5 py-10 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-14 md:px-8 md:py-14">
             <div className="md:sticky md:top-24 md:self-start">
@@ -56,6 +49,7 @@ async function EventContent({ params }: Pick<PageProps<"/e/[slug]">, "params">) 
                 startsAt={e.startsAt}
                 timezone={e.city.timezone}
                 venue={e.venue.name}
+                imageSrc={posterImageFor(e.id)}
                 className="rounded-[6px] ring-1 ring-paper/10"
               />
             </div>
