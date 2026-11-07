@@ -72,7 +72,8 @@ Both stubs together follow the whole path: the browser proves, the server checks
 
 - `support/chain.ts`, the `chain` fixture. `fund(address)` sends test ETH from Hardhat account 0. `read.*` reads the Houseful contract with viem. `usdtBalanceOf(address)` reads a wallet's test USDT, and `callOf(hash)` says which function a transaction called and how much ETH it sent. `atTime(timestamp, run)` moves the chain clock for the callback and puts the chain back afterwards, so a spec that uses it must run alone. `blockNumber()` and `waitForEvent()` wait for what the app does on chain. `untilShown(page, event, shows)` waits for the event, then for the page to show it, retrying and optionally reloading, and says which half failed.
 - `support/fixtures.ts`. `world`, `worldVerify`, `wallet`, `device`, `chain`. Each test gets a fresh browser context, so a fresh built-in wallet.
-- `support/page.ts`. `expectNoHorizontalScroll(page)` and the built-in wallet's address.
+- `support/auth.ts`. `signInFan(page, world, { person })` signs a fan in at /login with the stubbed World App and returns the account id the app answered with, so two phones given the same `person` land in one account. `signInHost(page, wallet)` signs a host in at /host/login by signing the app's challenge with an injected wallet (or `{ privateKey }` for one it makes). Both go through the real screens and set no cookie themselves.
+- `support/page.ts`. `expectNoHorizontalScroll(page)` (with `{ soft: true }` it fails the test but lets it go on) and the built-in wallet's address.
 - `support/catalog.ts`. The seeded shows the specs use. Update it when the seed changes.
 - `smoke/` checks the app. `harness/` checks the stubs and helpers.
 
@@ -80,7 +81,7 @@ Both stubs together follow the whole path: the browser proves, the server checks
 
 `e2e/chain/` follows a ticket through the app and checks the chain at each step: `seat-pay`, `door`, `waitlist-refund`, `cancel-withdraw` and `recover`.
 
-- Each test lists the show it needs from a host phone (`chain/host.ts`: /host/new, with the built-in wallet and the app's faucet) and buys from other phones with `device()`. Tests do not use up seed data, so they run again on a stack that is already up. `waitlist-refund` also joins and leaves a seeded sold out show, listed in `support/catalog.ts`.
+- /host and /tickets open only for a signed-in role, so each test signs its people in first: a host phone (`chain/host.ts`, `hostPhone(device)`) signs in with an injected wallet, then lists the show at /host/new with the built-in wallet and the app's faucet, and each fan signs in with World ID (`signInFan`) before buying, joining the line or opening the wallet page. The injected wallet only signs the host in: the app lists, cancels and withdraws from the built-in wallet. Fans buy with the account's World ID, so a show asking for a Selfie Check opens no World prompt at checkout, while a sold out show asks for Proof of Human and still does. Tests do not use up seed data, so they run again on a stack that is already up. `waitlist-refund` also joins and leaves a seeded sold out show, listed in `support/catalog.ts`.
 - `chain/helpers.ts` has the steps: open a show, pick a seat, pay, buy, join the line, hand back. Each waits for what the app shows when the step is done, and fails with the app's own words when the app refuses.
 - `chain/door.ts` copies the code from a ticket and pastes it into the scanner, the way door staff without a camera would.
 - `cancel-withdraw` moves the chain clock past the end of a show with `chain.atTime` and puts it back afterwards. Run it on its own: with `E2E_WORKERS` above one, another test could buy while the clock is in the future.
@@ -89,6 +90,22 @@ Both stubs together follow the whole path: the browser proves, the server checks
 ```sh
 pnpm --filter web e2e e2e/chain          # both projects, with its own stack
 pnpm --filter web e2e e2e/chain --project=phone
+```
+
+## Account specs
+
+`e2e/accounts/` is the identity layer, driven through the real screens.
+
+- `fan-sign-in`: World ID sign-in, the account menu, signing out and in, and one person reaching one account on any phone.
+- `host-sign-in`: the wallet signature, the host account, and what happens when the wallet will not sign.
+- `role-gates`: signed out visitors go to the login of the right role and on to where they were headed, and the wrong role never reaches the page.
+- `wallets`: link, choose and delink on /account, and the refusal to delink a wallet that holds a live ticket.
+- `world-refusal`: every way World can say no at sign-in, with the exact line the page shows, and replayed proofs.
+
+Where the app does not yet do what its own copy says, the test is marked with `test.fail` and says why, the way `waitlist-refund` does for reduced motion. It turns red when the app is fixed, which is the moment to delete the mark. On a 375px phone the signed-in header is wider than the window and hides Sign out, so the sideways scroll check and `signOut` record that as a soft failure and the specs go on.
+
+```sh
+pnpm --filter web e2e e2e/accounts       # both projects
 ```
 
 ## Settings and output
